@@ -11,7 +11,7 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
-      - MONGO_URI=mongodb://notex:notex_password@mongo:27017/notex
+      - MONGO_URI=mongodb://your_username:your_password@mongo:27017/notex # REPLACE USERNAME AND PASSWORD
       - REDIS_ADDR=redis:6379
       - CLIENT_ORIGIN=http://localhost:5173
     depends_on:
@@ -45,10 +45,10 @@ services:
     ports:
       - "27018:27017"
     environment:
-      - MONGODB_USERNAME=notex
-      - MONGODB_PASSWORD=notex_password
+      - MONGODB_USERNAME=your_username # REPLACE THIS
+      - MONGODB_PASSWORD=your_password # REPLACE THIS
       - MONGODB_DATABASE=notex
-      - MONGODB_ROOT_PASSWORD=doc_root_password
+      - MONGODB_ROOT_PASSWORD=your_root_password # REPLACE THIS
     volumes:
       - mongo_data:/data/db
     networks:
