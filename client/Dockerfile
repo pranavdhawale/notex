@@ -1,18 +1,24 @@
-FROM node:lts-alpine
-
+# Stage 1: Base
+FROM node:lts-alpine AS base
 WORKDIR /app
-
-# Copy package files
 COPY package.json package-lock.json* ./
 
-# Install dependencies
+# Stage 2: Development
+FROM base AS development
 RUN npm install --legacy-peer-deps
-
-# Copy source
 COPY . .
-
-# Expose Vite port
 EXPOSE 5173
-
-# Run dev server
 CMD ["npm", "run", "dev", "--", "--host"]
+
+# Stage 3: Builder
+FROM base AS builder
+RUN npm install --legacy-peer-deps
+COPY . .
+RUN npm run build
+
+# Stage 4: Production
+FROM nginx:alpine AS production
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
