@@ -1,0 +1,62 @@
+services:
+  server:
+    build: ./server
+    container_name: notex-server
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - MONGO_URI=mongodb://mongo:27017
+      - REDIS_ADDR=redis:6379
+      - CLIENT_ORIGIN=http://localhost:5173
+    depends_on:
+      - mongo
+      - redis
+    networks:
+      - notex-net
+    volumes:
+      - ./uploads:/app/uploads
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: notex-client
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    networks:
+      - notex-net
+    depends_on:
+      - server
+
+  mongo:
+    image: bitnami/mongodb:latest
+    container_name: notex-mongo
+    ports:
+      - "27018:27017"
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - notex-net
+
+  redis:
+    image: redis:alpine
+    container_name: notex-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - notex-net
+
+networks:
+  notex-net:
+    driver: bridge
+
+volumes:
+  mongo_data:
