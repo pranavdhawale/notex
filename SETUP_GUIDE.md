@@ -65,6 +65,29 @@ Our Dockerfiles use multi-stage builds to create tiny, optimized images for prod
 
 ---
 
+## 🗄️ Database Access
+
+### Connect with MongoDB Compass
+To connect visually using a tool like Compass:
+
+- **Connection String**:
+    ```
+    mongodb://notex:notex_password@localhost:27018/notex?authSource=notex
+    ```
+- **Details**:
+    - **Host**: `localhost`
+    - **Port**: `27018` (mapped from container)
+    - **Auth DB**: `notex`
+
+### Connect via CLI (Docker Exec)
+To access the MongoDB shell directly inside the container:
+
+```bash
+docker exec -it notex-mongo mongosh -u notex -p notex_password --authenticationDatabase notex
+```
+
+---
+
 ## 🛠 Troubleshooting
 
 ### CORS Errors
@@ -74,4 +97,13 @@ If the client cannot talk to the server, ensure `CLIENT_ORIGIN` in `docker-compo
 If ports 8080 or 5173 are already in use, you can change them in the `ports` mapping section of `docker-compose.yml`.
 
 ### MongoDB Permissions
-If MongoDB fails to start, verify you are using the `ALLOW_EMPTY_PASSWORD=yes` flag in development.
+We enforce authentication. Default credentials:
+- **User**: `notex`
+- **Password**: `notex_password`
+- **Database**: `notex`
+
+If you encounter authentication errors after switching configs, try resetting the volume:
+```bash
+docker-compose down -v
+docker-compose up --build
+```
