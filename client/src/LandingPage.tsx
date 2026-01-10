@@ -1,15 +1,30 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { StartupAnimation } from "./components/StartupAnimation";
 import "./LandingPage.css";
 
 export const LandingPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [showAnimation, setShowAnimation] = useState(true);
   const [joinRoomCode, setJoinRoomCode] = useState("");
   const [username, setUsername] = useState(
     localStorage.getItem("notex_username") || ""
   );
   const navigate = useNavigate();
+
+  // Check if we've shown the animation this session
+  useEffect(() => {
+    // const hasSeenIntro = sessionStorage.getItem("notex_intro_seen");
+    // if (hasSeenIntro) {
+    //   setShowAnimation(false);
+    // }
+  }, []);
+
+  const handleAnimationComplete = () => {
+    setShowAnimation(false);
+    // sessionStorage.setItem("notex_intro_seen", "true");
+  };
 
   // Ensure unique User ID exists
   const getUserId = () => {
@@ -67,49 +82,69 @@ export const LandingPage: React.FC = () => {
   };
 
   return (
-    <div className="landing-page">
-      <h1>Notex</h1>
-      <p>Real-time collaborative notes.</p>
+    <>
+      {showAnimation && <StartupAnimation onComplete={handleAnimationComplete} />}
+      
+      <div className="landing-page">
+        {/* Background Ambient Orbs */}
+        <div className="orb orb-1"></div>
+        <div className="orb orb-2"></div>
+        <div className="orb orb-3"></div>
 
-      <div style={{ marginBottom: "20px" }}>
-        <input
-          type="text"
-          placeholder="Your Name"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          style={{
-            padding: "10px",
-            fontSize: "1.1rem",
-            borderRadius: "6px",
-            border: "1px solid #ddd",
-            width: "250px",
-            textAlign: "center",
-          }}
-        />
-      </div>
+        <div className="glass-card">
+          <div className="card-header">
+            <h1 className="logo-text">Note<span>X</span></h1>
+            <p className="tagline">Where ideas converge instantly.</p>
+          </div>
 
-      <button
-        onClick={handleCreateRoom}
-        disabled={loading}
-        className="btn-create"
-      >
-        {loading ? "Creating..." : "Create New Room"}
-      </button>
-      <div className="join-room-section">
-        <div className="divider">OR</div>
-        <div className="join-input-group">
-          <input
-            type="text"
-            placeholder="Enter Room Code"
-            value={joinRoomCode}
-            onChange={(e) => setJoinRoomCode(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleJoinRoom()}
-          />
-          <button onClick={handleJoinRoom} disabled={!joinRoomCode.trim()}>
-            Join
-          </button>
+          <div className="input-group">
+            <label>Who are you?</label>
+            <input
+              type="text"
+              placeholder="Enter your name"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="glass-input"
+            />
+          </div>
+
+          <div className="actions">
+            <button
+              onClick={handleCreateRoom}
+              disabled={loading}
+              className="btn-primary"
+            >
+              {loading ? "Creating..." : "Start New Room"}
+            </button>
+            
+            <div className="divider">
+              <span>or</span>
+            </div>
+
+            <div className="join-row">
+              <input
+                type="text"
+                placeholder="Room Code"
+                value={joinRoomCode}
+                onChange={(e) => setJoinRoomCode(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleJoinRoom()}
+                className="glass-input small"
+              />
+              <button 
+                onClick={handleJoinRoom} 
+                disabled={!joinRoomCode.trim()}
+                className="btn-secondary"
+              >
+                Join
+              </button>
+            </div>
+          </div>
         </div>
+        
+        <footer className="glass-footer">
+          <p>Designed for MacOS Tahoe aesthetic</p>
+        </footer>
       </div>
-    </div>
+    </>
   );
 };
