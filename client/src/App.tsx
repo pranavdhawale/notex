@@ -4,7 +4,6 @@ import {
   Routes,
   Route,
   useParams,
-  useNavigate,
 } from "react-router-dom";
 import { Editor } from "./editor/Editor";
 import { LandingPage } from "./LandingPage";
@@ -13,7 +12,6 @@ import "./App.css";
 
 const EditorRoute = () => {
   const { roomSlug } = useParams<{ roomSlug: string }>();
-  const navigate = useNavigate();
   const [username, setUsername] = useState(
     localStorage.getItem("notex_username") || ""
   );
@@ -123,85 +121,21 @@ const EditorRoute = () => {
     );
   }
 
-  const handleDeleteRoom = async () => {
-    if (
-      confirm(
-        "Are you sure you want to delete this room? ALL DATA WILL BE LOST."
-      )
-    ) {
-      try {
-        await axios.delete(
-          `${
-            import.meta.env.VITE_API_URL || "http://localhost:8080"
-          }/api/rooms/${roomSlug}`
-        );
-        navigate("/");
-      } catch (e) {
-        alert("Failed to delete room");
-      }
-    }
-  };
+
 
   if (!roomSlug) return <div>Invalid Room</div>;
 
+  if (!roomSlug) return <div>Invalid Room</div>;
+
+  // Render Editor directly without app-header wrapper
   return (
     <div className="App">
-      <header className="app-header">
-        <div>
-          <h1
-            onClick={() => navigate("/")}
-            style={{
-              cursor: "pointer",
-              display: "inline-block",
-              marginRight: "10px",
-            }}
-          >
-            Notex
-          </h1>
-          <span style={{ color: "#666", fontSize: "0.9rem" }}>
-            {" "}
-            / {roomSlug}
-          </span>
-        </div>
-        <div style={{ display: "flex", gap: "10px" }}>
-          <button
-            onClick={() => navigate("/")}
-            style={{
-              background: "#666",
-              color: "white",
-              border: "none",
-              padding: "4px 8px",
-              borderRadius: "4px",
-              cursor: "pointer",
-            }}
-          >
-            Leave
-          </button>
-          {isOwner && (
-            <button
-              onClick={handleDeleteRoom}
-              style={{
-                background: "#d73a49",
-                color: "white",
-                border: "none",
-                padding: "4px 8px",
-                borderRadius: "4px",
-                cursor: "pointer",
-              }}
-            >
-              Delete Room
-            </button>
-          )}
-        </div>
-      </header>
-      <div className="app-content">
-        <Editor
-          roomSlug={roomSlug}
-          username={username}
-          userId={localStorage.getItem("notex_user_id") || ""}
-          isOwner={isOwner}
-        />
-      </div>
+      <Editor
+        roomSlug={roomSlug}
+        username={username}
+        userId={localStorage.getItem("notex_user_id") || ""}
+        isOwner={isOwner}
+      />
     </div>
   );
 };

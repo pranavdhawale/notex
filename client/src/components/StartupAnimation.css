@@ -1,0 +1,101 @@
+.startup-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #0f0c29; /* Match body bg */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  transition: opacity 0.5s ease-out;
+}
+
+.startup-container.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Wrapper moves up to match landing page header position */
+.logo-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -2px;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.logo-wrapper.move {
+  /* Move up to align with card header */
+  transform: translateY(-17.9vh); 
+}
+
+/* 
+  State 0: Huge X 
+  State 1: Smaller X, "Note" appears
+  State 2: Move Up + Color Change
+*/
+
+.x-mark {
+  /* Initial State: Giant X */
+  font-size: 10rem;
+  color: #E50914;
+  background: linear-gradient(135deg, #FF6B6B 0%, #C42D2D 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  
+  /* Transition Properties */
+  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: scale(1);
+  filter: drop-shadow(0 0 30px rgba(229, 9, 20, 0.6));
+}
+
+.x-mark.shrink {
+  /* Intermediate: Logo size but still Red */
+  font-size: 3.5rem;
+  transform: translateX(0);
+  filter: drop-shadow(0 0 10px rgba(229, 9, 20, 0.3));
+}
+
+.x-mark.finalize {
+  /* Final: Matches LandingPage accent color (Blue #0A84FF) */
+  background: #0A84FF; /* Fallback */
+  background: var(--accent-color);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 20px rgba(10, 132, 255, 0.5));
+}
+
+.prefix {
+  /* Initial State: Hidden and offset */
+  font-size: 3.5rem; /* Matches LandingPage h1 size */
+  color: white;
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transform: translateX(-20px);
+  
+  /* Transition Properties */
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  
+  background: linear-gradient(to right, #fff, #aaa);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.prefix.visible {
+  /* Final State: Visible and expanded */
+  opacity: 1;
+  width: auto;
+  transform: translateX(0);
+  margin-right: 0px; /* Adjust spacing to 'X' */
+}

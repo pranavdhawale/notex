@@ -74,9 +74,12 @@ const TiptapEditor: React.FC<{
   );
 };
 
-import { Sidebar } from "./Sidebar";
+import { FilesSidebar } from "./FilesSidebar";
+import { UsersSidebar } from "./UsersSidebar";
 import { Toolbar } from "./Toolbar";
 import axios from "axios";
+import { Users, LogOut, Trash } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export const Editor: React.FC<EditorProps> = ({
   roomSlug,
@@ -88,6 +91,27 @@ export const Editor: React.FC<EditorProps> = ({
   const [status, setStatus] = useState("connecting");
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showUsers, setShowUsers] = useState(true);
+  const navigate = useNavigate();
+
+  const handleLeave = () => {
+    navigate("/");
+  };
+
+  const handleDeleteRoom = async () => {
+    if (confirm("Are you sure you want to delete this room? ALL DATA WILL BE LOST.")) {
+      try {
+        await axios.delete(
+          `${
+            import.meta.env.VITE_API_URL || "http://localhost:8080"
+          }/api/rooms/${roomSlug}`
+        );
+        navigate("/");
+      } catch (e) {
+        alert("Failed to delete room");
+      }
+    }
+  };
 
   // Stable user details with persisted color
   const [userDetails] = useState(() => {
@@ -228,6 +252,15 @@ export const Editor: React.FC<EditorProps> = ({
 
   return (
     <div className="editor-layout">
+      {/* LEFT SIDEBAR: FILES */}
+      <FilesSidebar 
+        roomSlug={roomSlug} 
+        ydoc={ydoc} 
+        userId={userId} 
+        isRoomOwner={isOwner} 
+      />
+
+      {/* CENTER: EDITOR */}
       <div className="editor-main">
         <div
           className="status-bar"
@@ -235,11 +268,13 @@ export const Editor: React.FC<EditorProps> = ({
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
+            padding: "10px 20px",
+            borderBottom: "1px solid rgba(255,255,255,0.1)"
           }}
         >
-          <div>
-            Status: <span className={`status-${status}`}>{status}</span> | Room:{" "}
-            <span
+          <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+             <span className={`status-dot ${status === 'connected' ? 'online' : 'offline'}`}></span>
+             <span
               onClick={() => {
                 navigator.clipboard.writeText(roomSlug);
                 const el = document.getElementById("copy-feedback");
@@ -250,43 +285,70 @@ export const Editor: React.FC<EditorProps> = ({
               }}
               style={{
                 cursor: "pointer",
-                fontWeight: "bold",
-                textDecoration: "underline",
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.9)"
               }}
               title="Click to copy room code"
             >
-              {roomSlug}
+              Room: {roomSlug}
             </span>
             <span
               id="copy-feedback"
               style={{
                 opacity: 0,
                 transition: "opacity 0.3s",
-                marginLeft: "5px",
                 color: "#4caf50",
                 fontSize: "0.8em",
               }}
             >
               Copied!
             </span>
-            | User: {username}
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            style={{ padding: "4px 8px", cursor: "pointer" }}
-          >
-            {saving ? "Saving..." : "Save Snapshot"}
-          </button>
+          
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {isOwner && (
+              <button
+                onClick={handleDeleteRoom}
+                className="btn-icon delete"
+                title="Delete Room"
+                style={{ color: '#ff4d4f' }}
+              >
+                <Trash size={20} />
+              </button>
+            )}
+            <button
+              onClick={handleLeave}
+              className="btn-icon"
+              title="Leave Room"
+            >
+              <LogOut size={20} />
+            </button>
+            <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 5px' }}></div>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="btn-primary"
+              style={{ padding: "6px 12px", fontSize: "0.9rem" }}
+            >
+              {saving ? "Saving..." : "Save Snapshot"}
+            </button>
+            <button 
+              onClick={() => setShowUsers(!showUsers)}
+              className="btn-icon"
+              title="Toggle Users"
+            >
+              <Users size={20} />
+            </button>
+          </div>
         </div>
         <TiptapEditor provider={provider} userDetails={userDetails} />
       </div>
-      <Sidebar
-        roomSlug={roomSlug}
-        ydoc={ydoc}
-        provider={provider}
-        userId={userId}
-        isRoomOwner={isOwner}
+
+      {/* RIGHT SIDEBAR: USERS */}
+      <UsersSidebar 
+        provider={provider} 
+        isOpen={showUsers} 
+        onClose={() => setShowUsers(false)} 
       />
     </div>
   );
