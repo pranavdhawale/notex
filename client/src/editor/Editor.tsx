@@ -67,9 +67,11 @@ const TiptapEditor: React.FC<{
   });
 
   return (
-    <div className="editor-container">
+    <div className="editor-container" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Toolbar editor={editor} />
-      <EditorContent editor={editor} />
+      <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+        <EditorContent editor={editor} />
+      </div>
     </div>
   );
 };
@@ -77,6 +79,7 @@ const TiptapEditor: React.FC<{
 import { FilesSidebar } from "./FilesSidebar";
 import { UsersSidebar } from "./UsersSidebar";
 import { Toolbar } from "./Toolbar";
+import { ThemeToggle } from "../components/ThemeToggle";
 import axios from "axios";
 import { Users, LogOut, Trash } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -91,7 +94,10 @@ export const Editor: React.FC<EditorProps> = ({
   const [status, setStatus] = useState("connecting");
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const [saving, setSaving] = useState(false);
-  const [showUsers, setShowUsers] = useState(true);
+  const [showUsers, setShowUsers] = useState(() => {
+    const saved = localStorage.getItem("notex_show_users");
+    return saved === null ? true : saved === "true";
+  });
   const navigate = useNavigate();
 
   const handleLeave = () => {
@@ -126,6 +132,10 @@ export const Editor: React.FC<EditorProps> = ({
       color: color,
     };
   });
+
+  useEffect(() => {
+    localStorage.setItem("notex_show_users", String(showUsers));
+  }, [showUsers]);
 
   // Load Snapshot and Check Room
   useEffect(() => {
@@ -185,38 +195,50 @@ export const Editor: React.FC<EditorProps> = ({
   }, [status, roomSlug]);
 
   useEffect(() => {
-    const doc = new Y.Doc();
-    setYdoc(doc);
+    let provider: WebsocketProvider | null = null;
+    let doc: Y.Doc | null = null;
 
-    const wsUrl =
-      (import.meta.env.VITE_API_URL || "http://localhost:8080").replace(
-        "http",
-        "ws"
-      ) + "/ws";
+    const setup = () => {
+      doc = new Y.Doc();
+      setYdoc(doc);
 
-    const prov = new WebsocketProvider(wsUrl, roomSlug, doc, {
-      params: { room: roomSlug },
-    });
+      const wsUrl =
+        (import.meta.env.VITE_API_URL || "http://localhost:8080").replace(
+          "http",
+          "ws"
+        ) + "/ws";
 
-    prov.on("status", (event: any) => {
-      setStatus(event.status);
-      if (event.status === "connected") {
-        prov.awareness.setLocalStateField("user", userDetails);
-      }
-    });
+      provider = new WebsocketProvider(wsUrl, roomSlug, doc, {
+        params: { room: roomSlug },
+      });
 
-    // Initial awareness set
-    prov.awareness.setLocalStateField("user", userDetails);
+      provider.on("status", (event: any) => {
+        setStatus(event.status);
+        if (event.status === "connected" && provider) {
+           // Ensure we only set awareness when fully connected
+           provider.awareness.setLocalStateField("user", userDetails);
+        }
+      });
 
-    setProvider(prov);
+      setProvider(provider);
+    };
+
+    // Small delay to ensure previous cleanup is complete (fixes ghost cursors on strict mode/hot reload)
+    const timeoutId = setTimeout(setup, 100);
 
     return () => {
-      prov.destroy();
-      doc.destroy();
+      clearTimeout(timeoutId);
+      if (provider) {
+        provider.awareness.setLocalStateField("user", null); // Explicitly clear user
+        provider.destroy();
+      }
+      if (doc) {
+        doc.destroy();
+      }
       setProvider(null);
       setYdoc(null);
     };
-  }, [roomSlug, userDetails]); // depend on stable userDetails
+  }, [roomSlug, userDetails]);
 
   const handleSave = async () => {
     if (!ydoc) return;
@@ -262,16 +284,7 @@ export const Editor: React.FC<EditorProps> = ({
 
       {/* CENTER: EDITOR */}
       <div className="editor-main">
-        <div
-          className="status-bar"
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "10px 20px",
-            borderBottom: "1px solid rgba(255,255,255,0.1)"
-          }}
-        >
+        <div className="status-bar">
           <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
              <span className={`status-dot ${status === 'connected' ? 'online' : 'offline'}`}></span>
              <span
@@ -292,6 +305,23 @@ export const Editor: React.FC<EditorProps> = ({
             >
               Room: {roomSlug}
             </span>
+            <button
+              onClick={handleLeave}
+              className="btn-icon"
+              title="Leave Room"
+            >
+              <LogOut size={20} />
+            </button>
+            {isOwner && (
+              <button
+                onClick={handleDeleteRoom}
+                className="btn-icon delete"
+                title="Delete Room"
+                style={{ color: '#ff4d4f' }}
+              >
+                <Trash size={20} />
+              </button>
+            )}
             <span
               id="copy-feedback"
               style={{
@@ -305,25 +335,8 @@ export const Editor: React.FC<EditorProps> = ({
             </span>
           </div>
           
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {isOwner && (
-              <button
-                onClick={handleDeleteRoom}
-                className="btn-icon delete"
-                title="Delete Room"
-                style={{ color: '#ff4d4f' }}
-              >
-                <Trash size={20} />
-              </button>
-            )}
-            <button
-              onClick={handleLeave}
-              className="btn-icon"
-              title="Leave Room"
-            >
-              <LogOut size={20} />
-            </button>
-            <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 5px' }}></div>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <ThemeToggle className="btn-icon" />
             <button
               onClick={handleSave}
               disabled={saving}
@@ -332,6 +345,7 @@ export const Editor: React.FC<EditorProps> = ({
             >
               {saving ? "Saving..." : "Save Snapshot"}
             </button>
+            <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', height: '24px', margin: '0 5px' }}></div>
             <button 
               onClick={() => setShowUsers(!showUsers)}
               className="btn-icon"
