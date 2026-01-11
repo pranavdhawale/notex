@@ -5,7 +5,6 @@ import {
   Italic, 
   Strikethrough, 
   Underline as UnderlineIcon, 
-  Code, 
   Highlighter, 
   Heading1, 
   Heading2, 
@@ -80,13 +79,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editor }) => {
         title="Underline"
       >
         <UnderlineIcon size={16} />
-      </button>
-      <button
-        onClick={() => editor.chain().focus().toggleCode().run()}
-        className={`toolbar-btn-circle ${editor.isActive("code") ? "is-active" : ""}`}
-        title="Inline Code"
-      >
-        <Code size={16} />
       </button>
       <button
         onClick={() => editor.chain().focus().toggleHighlight().run()}

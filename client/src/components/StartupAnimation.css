@@ -4,7 +4,7 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: #0f0c29; /* Match body bg */
+  background: var(--bg-gradient);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -65,12 +65,12 @@
 
 .x-mark.finalize {
   /* Final: Matches LandingPage accent color (Blue #0A84FF) */
-  background: #0A84FF; /* Fallback */
+  background: #FF004D; /* Fallback */
   background: var(--accent-color);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 20px rgba(10, 132, 255, 0.5));
+  filter: drop-shadow(0 0 20px rgba(255, 0, 77, 0.5));
 }
 
 .prefix {
@@ -86,7 +86,7 @@
   /* Transition Properties */
   transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
   
-  background: linear-gradient(to right, #fff, #aaa);
+  background: linear-gradient(to right, var(--text-main), var(--text-dim));
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
