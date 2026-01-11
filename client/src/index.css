@@ -1,25 +1,25 @@
 :root {
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  line-height: 1.55;
   font-weight: 400;
 
   color-scheme: light dark;
   color: var(--text-main);
   
   /* Glassmorphism Variables */
-  /* Default to Dark Mode Variables (Galactic) */
-  --glass-bg: rgba(29, 43, 83, 0.25);
-  --glass-border: rgba(161, 234, 251, 0.15); 
-  --glass-shadow: 0 8px 32px 0 rgba(3, 6, 55, 0.6);
-  --accent-color: #FF004D;
-  --text-main: #FDFDFD;
-  --text-dim: rgba(253, 253, 253, 0.6);
-  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
-  --button-hover: rgba(255, 255, 255, 0.15);
-  --bg-gradient: linear-gradient(135deg, #030637 0%, #3C0753 50%, #1D2B53 100%);
-  --orb-1: #910A67;
-  --orb-2: #5A9CB5;
-  --orb-3: #D36B00;
+  /* Default to Dark Mode Variables (Graphite) */
+  --glass-bg: rgba(20, 20, 22, 0.35);
+  --glass-border: rgba(255, 255, 255, 0.10); 
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.55);
+  --accent-color: #D1D1D6;
+  --text-main: #F2F2F3;
+  --text-dim: rgba(242, 242, 243, 0.65);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.20);
+  --button-hover: rgba(255, 255, 255, 0.12);
+  --bg-gradient: linear-gradient(135deg, #0B0B0D 0%, #151518 50%, #1E1E22 100%);
+  --orb-1: #2A2A2E;
+  --orb-2: #3A3A40;
+  --orb-3: #1C1C20;
   
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -28,35 +28,35 @@
 }
 
 [data-theme='light'] {
-  /* Light Tahoe Theme */
-  --glass-bg: rgba(255, 255, 255, 0.45); 
-  --glass-border: rgba(163, 216, 255, 0.4);
-  --glass-shadow: 0 8px 32px 0 rgba(66, 3, 44, 0.08);
-  --accent-color: #FF76CE;
-  --text-main: #42032C;
-  --bg-gradient: linear-gradient(135deg, #F1EFDC 0%, #FFF6BE 50%, #B7FBFF 100%);
-  --text-dim: rgba(66, 3, 44, 0.6); 
-  --scrollbar-thumb: rgba(66, 3, 44, 0.2);
-  --button-hover: rgba(255, 255, 255, 0.5);
-  --orb-1: #94FFD8;
-  --orb-2: #FFA1AC;
-  --orb-3: #FEEE91;
+  /* Paper Liquid Glass Theme */
+  --glass-bg: rgba(255, 255, 255, 0.55); 
+  --glass-border: rgba(0, 0, 0, 0.10);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.10);
+  --accent-color: #3A3A3C;
+  --text-main: #1C1C1E;
+  --bg-gradient: linear-gradient(135deg, #FAFAFA 0%, #F2F2F4 50%, #EAEAED 100%);
+  --text-dim: rgba(28, 28, 30, 0.65); 
+  --scrollbar-thumb: rgba(28, 28, 30, 0.20);
+  --button-hover: rgba(255, 255, 255, 0.45);
+  --orb-1: #E5E5E8;
+  --orb-2: #DADADD;
+  --orb-3: #F0F0F2;
 }
 
 [data-theme='dark'] {
-  /* Implicitly default, but explicit overwrite if needed */
-  --glass-bg: rgba(29, 43, 83, 0.25);
-  --glass-border: rgba(161, 234, 251, 0.15); 
-  --glass-shadow: 0 8px 32px 0 rgba(3, 6, 55, 0.6);
-  --accent-color: #FF004D;
-  --text-main: #FDFDFD;
-  --text-dim: rgba(253, 253, 253, 0.6);
-  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
-  --button-hover: rgba(255, 255, 255, 0.15);
-  --bg-gradient: linear-gradient(135deg, #030637 0%, #3C0753 50%, #1D2B53 100%);
-  --orb-1: #910A67;
-  --orb-2: #5A9CB5;
-  --orb-3: #D36B00;
+  /* Graphite Liquid Glass Theme */
+  --glass-bg: rgba(20, 20, 22, 0.35);
+  --glass-border: rgba(255, 255, 255, 0.10); 
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.55);
+  --accent-color: #D1D1D6;
+  --text-main: #F2F2F3;
+  --text-dim: rgba(242, 242, 243, 0.65);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.20);
+  --button-hover: rgba(255, 255, 255, 0.12);
+  --bg-gradient: linear-gradient(135deg, #0B0B0D 0%, #151518 50%, #1E1E22 100%);
+  --orb-1: #2A2A2E;
+  --orb-2: #3A3A40;
+  --orb-3: #1C1C20;
   
   font-synthesis: none;
   text-rendering: optimizeLegibility;
