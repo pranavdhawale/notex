@@ -299,7 +299,7 @@ export const Editor: React.FC<EditorProps> = ({
               style={{
                 cursor: "pointer",
                 fontWeight: 600,
-                color: "rgba(255,255,255,0.9)"
+                color: "var(--text-main)"
               }}
               title="Click to copy room code"
             >
