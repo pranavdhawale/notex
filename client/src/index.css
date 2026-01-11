@@ -4,14 +4,59 @@
   font-weight: 400;
 
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-main);
   
   /* Glassmorphism Variables */
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-  --accent-color: #0A84FF;
-  --bg-gradient: radial-gradient(circle at 50% 50%, #1a2a6c, #b21f1f, #fdbb2d); /* Fallback */
+  /* Default to Dark Mode Variables (Galactic) */
+  --glass-bg: rgba(29, 43, 83, 0.25);
+  --glass-border: rgba(161, 234, 251, 0.15); 
+  --glass-shadow: 0 8px 32px 0 rgba(3, 6, 55, 0.6);
+  --accent-color: #FF004D;
+  --text-main: #FDFDFD;
+  --text-dim: rgba(253, 253, 253, 0.6);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --button-hover: rgba(255, 255, 255, 0.15);
+  --bg-gradient: linear-gradient(135deg, #030637 0%, #3C0753 50%, #1D2B53 100%);
+  --orb-1: #910A67;
+  --orb-2: #5A9CB5;
+  --orb-3: #D36B00;
+  
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-theme='light'] {
+  /* Light Tahoe Theme */
+  --glass-bg: rgba(255, 255, 255, 0.45); 
+  --glass-border: rgba(163, 216, 255, 0.4);
+  --glass-shadow: 0 8px 32px 0 rgba(66, 3, 44, 0.08);
+  --accent-color: #FF76CE;
+  --text-main: #42032C;
+  --bg-gradient: linear-gradient(135deg, #F1EFDC 0%, #FFF6BE 50%, #B7FBFF 100%);
+  --text-dim: rgba(66, 3, 44, 0.6); 
+  --scrollbar-thumb: rgba(66, 3, 44, 0.2);
+  --button-hover: rgba(255, 255, 255, 0.5);
+  --orb-1: #94FFD8;
+  --orb-2: #FFA1AC;
+  --orb-3: #FEEE91;
+}
+
+[data-theme='dark'] {
+  /* Implicitly default, but explicit overwrite if needed */
+  --glass-bg: rgba(29, 43, 83, 0.25);
+  --glass-border: rgba(161, 234, 251, 0.15); 
+  --glass-shadow: 0 8px 32px 0 rgba(3, 6, 55, 0.6);
+  --accent-color: #FF004D;
+  --text-main: #FDFDFD;
+  --text-dim: rgba(253, 253, 253, 0.6);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --button-hover: rgba(255, 255, 255, 0.15);
+  --bg-gradient: linear-gradient(135deg, #030637 0%, #3C0753 50%, #1D2B53 100%);
+  --orb-1: #910A67;
+  --orb-2: #5A9CB5;
+  --orb-3: #D36B00;
   
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -25,8 +70,8 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
-  background: #0f0c29;
-  background: linear-gradient(to right, #24243e, #302b63, #0f0c29);
+  background: var(--bg-gradient);
+  background: var(--bg-gradient);
   overflow-x: hidden;
 }
 

@@ -23,7 +23,7 @@
 .orb-1 {
   width: 400px;
   height: 400px;
-  background: #ff00cc;
+  background: var(--orb-1);
   top: -100px;
   left: -100px;
 }
@@ -31,7 +31,7 @@
 .orb-2 {
   width: 500px;
   height: 500px;
-  background: #333399;
+  background: var(--orb-2);
   bottom: -150px;
   right: -100px;
   animation-delay: -5s;
@@ -40,7 +40,7 @@
 .orb-3 {
   width: 300px;
   height: 300px;
-  background: #ff9900;
+  background: var(--orb-3);
   top: 40%;
   left: 60%;
   opacity: 0.4;
@@ -86,7 +86,7 @@
   margin: 0;
   font-weight: 800;
   letter-spacing: -2px;
-  background: linear-gradient(to right, #fff, #aaa);
+  background: linear-gradient(to right, var(--text-main), #6e2c56);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -100,8 +100,7 @@
 
 .tagline {
   margin-top: 5px;
-  color: rgba(255,255,255,0.6);
-  font-size: 1rem;
+  color: var(--text-dim);
   font-weight: 300;
 }
 
@@ -115,7 +114,7 @@
 .input-group label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.8);
+  color: var(--text-dim);
   margin-left: 5px;
 }
 
@@ -123,10 +122,10 @@
   width: 100%;
   padding: 16px;
   font-size: 1.1rem;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
-  color: white;
+  color: var(--text-main);
   transition: all 0.2s ease;
   box-sizing: border-box; /* Fix width issues */
 }
@@ -139,14 +138,16 @@
 }
 
 .glass-input::placeholder {
-  color: rgba(255,255,255,0.3);
+  color: var(--text-dim);
+  opacity: 0.5;
 }
 
 /* Buttons */
 .btn-primary {
   width: 100%;
   background: var(--accent-color);
-  color: white;
+  color: white; /* Always white on primary btn */
+  font-weight: 700;
   border: none;
   padding: 16px;
   font-size: 1.1rem;
@@ -154,7 +155,7 @@
 }
 
 .btn-primary:hover {
-  background: #0077e6;
+  filter: brightness(1.1);
 }
 
 .btn-primary:active {
@@ -176,7 +177,7 @@
 .divider {
   display: flex;
   align-items: center;
-  color: rgba(255,255,255,0.3);
+  color: var(--text-dim);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -209,13 +210,13 @@
 }
 
 .btn-secondary {
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: white;
+  background: var(--glass-border);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main);
 }
 
 .btn-secondary:hover {
-  background: rgba(255,255,255,0.2);
+  background: var(--button-hover);
 }
 
 .btn-secondary:disabled {
@@ -228,7 +229,7 @@
   position: absolute;
   bottom: 20px;
   font-size: 0.8rem;
-  color: rgba(255,255,255,0.3);
+  color: var(--text-dim);
   text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
 

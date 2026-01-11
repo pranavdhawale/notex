@@ -63,7 +63,7 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.9);
+  color: var(--text-main);
 }
 
 .badge {
@@ -71,7 +71,7 @@
   padding: 2px 8px;
   border-radius: 10px;
   font-size: 0.75rem;
-  color: rgba(255,255,255,0.8);
+  color: var(--text-dim);
 }
 
 /* --- Main Editor Area (Floating Center) --- */
@@ -89,36 +89,63 @@
   position: relative;
 }
 
+.editor-main .status-bar {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.status-bar .btn-icon {
+  width: 38px !important;
+  height: 38px !important;
+  aspect-ratio: 1/1 !important;
+  border-radius: 50% !important;
+  flex-shrink: 0;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.editor-main .editor-container {
+  flex: 1;
+  overflow: hidden; /* Prevent this container from scrolling */
+  display: flex;
+  flex-direction: column;
+}
+
 /* --- Tiptap Overrides --- */
 /* --- Tiptap Overrides --- */
 .ProseMirror {
   outline: none;
   padding: 30px 40px;
-  color: rgba(255,255,255,0.9);
+  color: var(--text-main);
   font-size: 1.05rem;
   line-height: 1.7;
   max-width: 800px;
   margin: 0 auto;
-  height: 100%; /* Take full height of container */
-  overflow-y: auto; /* Enable vertical scrolling */
+  min-height: 100%; /* Allow content to grow */
 }
 
-/* Custom Scrollbar for editor */
-.ProseMirror::-webkit-scrollbar {
+/* Custom Scrollbar for editor wrapper */
+.editor-container > div::-webkit-scrollbar {
   width: 8px;
 }
 
-.ProseMirror::-webkit-scrollbar-track {
+.editor-container > div::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.ProseMirror::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+.editor-container > div::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
-.ProseMirror::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+.editor-container > div::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-color);
 }
 
 /* --- Files Styling --- */
@@ -142,8 +169,43 @@
   transition: all 0.2s ease;
 }
 
+/* --- Collaboration Cursor Fix --- */
+.collaboration-cursor__caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 2px solid #fff;
+  border-right: 2px solid #fff;
+  word-break: normal;
+  pointer-events: none;
+}
+
+.collaboration-cursor__label {
+  position: absolute;
+  top: -1.4em;
+  left: -1px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  user-select: none;
+  color: #000;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px 3px 3px 0;
+  white-space: nowrap;
+  opacity: 0.8; 
+  z-index: 10;
+}
+
 .file-item-glass:hover {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(163, 216, 255, 0.2);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.file-item-glass:hover {
+  background: rgba(255, 255, 255, 0.4);
   transform: translateY(-1px);
 }
 
@@ -161,7 +223,7 @@
 }
 
 .file-info a {
-  color: rgba(255,255,255,0.9);
+  color: var(--text-main);
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 500;
@@ -172,7 +234,7 @@
 
 .file-meta {
   font-size: 0.75rem;
-  color: rgba(255,255,255,0.5);
+  color: var(--text-dim);
 }
 
 /* --- Users Styling --- */
@@ -215,7 +277,7 @@
 .user-name {
   font-size: 0.9rem;
   font-weight: 500;
-  color: rgba(255,255,255,0.9);
+  color: var(--text-main);
 }
 
 .user-status {
@@ -240,30 +302,33 @@
   display: flex;
   justify-content: center;
   padding: 10px;
-  background: rgba(255,255,255,0.05);
+  background: var(--glass-bg);
   border-bottom: 1px solid var(--glass-border);
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .toolbar-btn-circle {
   width: 36px;
   height: 36px;
+  aspect-ratio: 1/1;
   border-radius: 50%;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid var(--glass-border);
   background: rgba(255,255,255,0.05);
-  color: rgba(255,255,255,0.7);
+  color: var(--text-main);
+  opacity: 0.8;
   display: flex;
   justify-content: center;
   align-items: center;
   cursor: pointer;
   transition: all 0.2s ease;
   padding: 0;
+  flex-shrink: 0;
 }
 
 .toolbar-btn-circle:hover {
-  background: rgba(255,255,255,0.2);
-  color: white;
+  background: var(--button-hover);
+  color: var(--text-main);
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
@@ -285,18 +350,23 @@
 }
 
 .btn-icon {
-  background: transparent;
-  border: none;
-  color: rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-dim);
   cursor: pointer;
-  padding: 4px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
   border-radius: 50%;
   display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
 }
 
 .btn-icon:hover {
-  background: rgba(255,255,255,0.1);
-  color: white;
+  background: var(--glass-bg);
+  color: var(--text-main);
 }
 
 .btn-icon.delete:hover {

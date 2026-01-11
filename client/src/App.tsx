@@ -62,60 +62,56 @@ const EditorRoute = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          background: "rgba(0,0,0,0.5)",
+          background: "var(--bg-gradient)",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
           zIndex: 1000,
         }}
       >
-        <div
-          style={{
-            background: "white",
-            padding: "2rem",
-            borderRadius: "8px",
-            textAlign: "center",
-          }}
-        >
-          <h3>Enter your name to join</h3>
-          <input
-            type="text"
-            value={tempName}
-            onChange={(e) => setTempName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && tempName.trim()) {
-                localStorage.setItem("notex_username", tempName.trim());
-                setUsername(tempName.trim());
-              }
-            }}
-            style={{
-              padding: "8px",
-              fontSize: "1rem",
-              marginBottom: "1rem",
-              width: "200px",
-            }}
-            autoFocus
-          />
-          <br />
-          <button
-            onClick={() => {
-              if (tempName.trim()) {
-                localStorage.setItem("notex_username", tempName.trim());
-                setUsername(tempName.trim());
-              }
-            }}
-            disabled={!tempName.trim()}
-            style={{
-              padding: "8px 16px",
-              background: "#0366d6",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-            }}
-          >
-            Join Room
-          </button>
+        {/* Reuse glass-card styling from LandingPage */}
+        <div className="glass-card" style={{ width: '400px', padding: '40px' }}>
+          <h2 style={{ 
+            color: 'var(--text-main)', 
+            marginBottom: '20px', 
+            textAlign: 'center',
+            fontSize: '1.5rem' 
+          }}>
+            Enter your name to join
+          </h2>
+          
+          <div className="input-group">
+            <input
+              type="text"
+              placeholder="Your Name"
+              value={tempName}
+              onChange={(e) => setTempName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && tempName.trim()) {
+                  localStorage.setItem("notex_username", tempName.trim());
+                  setUsername(tempName.trim());
+                }
+              }}
+              className="glass-input"
+              autoFocus
+            />
+          </div>
+
+          <div className="actions" style={{ justifyContent: 'center', marginTop: '20px' }}>
+            <button
+              onClick={() => {
+                if (tempName.trim()) {
+                  localStorage.setItem("notex_username", tempName.trim());
+                  setUsername(tempName.trim());
+                }
+              }}
+              disabled={!tempName.trim()}
+              className="btn-primary"
+              style={{ width: '100%' }}
+            >
+              Join Room
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -140,14 +136,18 @@ const EditorRoute = () => {
   );
 };
 
+import { ThemeProvider } from "./components/ThemeContext";
+
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/:roomSlug" element={<EditorRoute />} />
-      </Routes>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/:roomSlug" element={<EditorRoute />} />
+        </Routes>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }
 
