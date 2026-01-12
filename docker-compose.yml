@@ -2,69 +2,31 @@ services:
   server:
     build:
       context: ./server
-      target: development
+      target: production
     container_name: notex-server
-    volumes:
-      - ./server:/app
-      - ./uploads:/app/uploads
-    ports:
-      - "8080:8080"
-    environment:
-      - PORT=8080
-      - MONGO_URI=mongodb://your_username:your_password@mongo:27017/notex # REPLACE USERNAME AND PASSWORD
-      - REDIS_ADDR=redis:6379
-      - CLIENT_ORIGIN=http://localhost:5173
-    depends_on:
-      - mongo
-      - redis
+    restart: unless-stopped
+    expose:
+      - "8080"
+    env_file:
+      - /mnt/ssd/docker/secrets/notex.env
     networks:
-      - notex-net
-
+      - proxy
 
   client:
     build:
       context: ./client
-      dockerfile: Dockerfile
-      target: development
+      target: production
+      args:
+        - VITE_API_URL=${VITE_API_URL}
     container_name: notex-client
-    ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_URL=http://localhost:8080
-    volumes:
-      - ./client:/app
-      - /app/node_modules
-    networks:
-      - notex-net
+    restart: unless-stopped
+    expose:
+      - "80"
     depends_on:
       - server
-
-  mongo:
-    image: bitnami/mongodb:latest
-    container_name: notex-mongo
-    ports:
-      - "27018:27017"
-    environment:
-      - MONGODB_USERNAME=your_username # REPLACE THIS
-      - MONGODB_PASSWORD=your_password # REPLACE THIS
-      - MONGODB_DATABASE=notex
-      - MONGODB_ROOT_PASSWORD=your_root_password # REPLACE THIS
-    volumes:
-      - mongo_data:/data/db
     networks:
-      - notex-net
-
-  redis:
-    image: redis:alpine
-    container_name: notex-redis
-    ports:
-      - "6379:6379"
-    networks:
-      - notex-net
+      - proxy
 
 networks:
-  notex-net:
-    driver: bridge
-
-volumes:
-  mongo_data:
+  proxy:
+    external: true
