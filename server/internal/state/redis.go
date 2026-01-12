@@ -9,9 +9,10 @@ import (
 
 var RedisClient *redis.Client
 
-func InitRedis(addr string) {
+func InitRedis(addr, password string) {
 	RedisClient = redis.NewClient(&redis.Options{
-		Addr: addr,
+		Addr:     addr,
+		Password: password,
 	})
 
 	ctx := context.Background()
