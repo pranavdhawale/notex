@@ -29,7 +29,8 @@ func main() {
 	if redisAddr == "" {
 		redisAddr = "localhost:6379"
 	}
-	state.InitRedis(redisAddr)
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+	state.InitRedis(redisAddr, redisPassword)
 
 	r := gin.Default()
 	
