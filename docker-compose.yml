@@ -8,9 +8,10 @@ services:
     expose:
       - "8080"
     env_file:
-      - /mnt/ssd/docker/secrets/notex.env
+      - .env
     networks:
       - proxy
+      - internal
 
   client:
     build:
@@ -29,4 +30,6 @@ services:
 
 networks:
   proxy:
+    external: true
+  internal:
     external: true
