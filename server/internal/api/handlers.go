@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -47,6 +48,7 @@ func CreateRoom(c *gin.Context) {
 
 	_, err := collection.InsertOne(ctx, room)
 	if err != nil {
+		log.Printf("Failed to insert room: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create room"})
 		return
 	}

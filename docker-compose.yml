@@ -8,10 +8,11 @@ services:
     expose:
       - "8080"
     env_file:
-      - .env
+      - /srv/docker/secrets/notex.env
     networks:
-      - proxy
       - internal
+    volumes:
+      - /srv/docker/volumes/notex/uploads:/app/uploads
 
   client:
     build:
@@ -27,9 +28,12 @@ services:
       - server
     networks:
       - proxy
+      - internal
 
 networks:
   proxy:
     external: true
   internal:
     external: true
+
+
