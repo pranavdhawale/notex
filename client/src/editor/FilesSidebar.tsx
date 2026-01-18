@@ -142,9 +142,20 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       onDragLeave={() => setIsDragging(false)}
       onDrop={handleDrop}
     >
-      <div className="panel-header">
-        <h3>Files</h3>
-        <span className="badge">{files.length}</span>
+      <div className="panel-header liquid-header">
+        {/* Liquid Glass Background */}
+        <div className="liquid-glass-container">
+          <div className="liquid-glass-backdrop"></div>
+          <div className="liquid-glass-distortion top"></div>
+          <div className="liquid-glass-distortion bottom"></div>
+          <div className="liquid-glass-distortion left"></div>
+          <div className="liquid-glass-distortion right"></div>
+        </div>
+        
+        <div className="header-content">
+            <h3>Files</h3>
+            <span className="badge">{files.length}</span>
+        </div>
       </div>
 
       <div className="files-list custom-scrollbar">

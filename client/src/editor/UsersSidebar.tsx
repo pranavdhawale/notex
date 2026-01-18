@@ -47,11 +47,22 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
 
   return (
     <div className={`sidebar-panel right-panel ${isOpen ? "open" : "closed"}`}>
-      <div className="panel-header">
-        <h3>Active Users</h3>
-        <button onClick={onClose} className="btn-icon">
-          <X size={18} />
-        </button>
+      <div className="panel-header liquid-header">
+        {/* Liquid Glass Background */}
+        <div className="liquid-glass-container">
+          <div className="liquid-glass-backdrop"></div>
+          <div className="liquid-glass-distortion top"></div>
+          <div className="liquid-glass-distortion bottom"></div>
+          <div className="liquid-glass-distortion left"></div>
+          <div className="liquid-glass-distortion right"></div>
+        </div>
+
+        <div className="header-content">
+            <h3>Active Users</h3>
+            <button onClick={onClose} className="btn-icon">
+            <X size={18} />
+            </button>
+        </div>
       </div>
 
       <div className="user-list custom-scrollbar">
