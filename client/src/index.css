@@ -34,6 +34,11 @@
   --orb-2: #3A3A40;
   --orb-3: #1C1C20;
   
+  /* Adaptive Glass Element Backgrounds */
+  --glass-item-bg: rgba(255, 255, 255, 0.03);
+  --btn-bg-idle: rgba(255, 255, 255, 0.05);
+  --glass-border-dim: rgba(255, 255, 255, 0.04);
+  
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -54,6 +59,11 @@
   --orb-1: #E5E5E8;
   --orb-2: #DADADD;
   --orb-3: #F0F0F2;
+
+  /* Adaptive Glass Element Backgrounds (Dark tint for light mode) */
+  --glass-item-bg: rgba(0, 0, 0, 0.03);
+  --btn-bg-idle: rgba(0, 0, 0, 0.05);
+  --glass-border-dim: rgba(0, 0, 0, 0.04);
   
   /* Apple Semantic Colors (Light Theme Variants) */
   --color-primary: #007AFF;
