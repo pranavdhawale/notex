@@ -133,8 +133,8 @@
 .glass-input:focus {
   outline: none;
   background: rgba(0, 0, 0, 0.3);
-  border-color: var(--accent-color);
-  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.2);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
 }
 
 .glass-input::placeholder {
@@ -145,7 +145,7 @@
 /* Buttons */
 .btn-primary {
   width: 100%;
-  background: var(--accent-color);
+  background: var(--color-primary);
   color: white; /* Always white on primary btn */
   font-weight: 700;
   border: none;

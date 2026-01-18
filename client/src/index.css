@@ -6,6 +6,19 @@
   color-scheme: light dark;
   color: var(--text-main);
   
+  /* Apple Semantic Colors */
+  --color-primary: #007AFF;
+  --color-success: #34C759;
+  --color-warning: #FF9500;
+  --color-error: #FF3B30;
+  --color-caution: #FFCC00;
+  
+  /* Apple Gray Scale */
+  --gray-light: #E5E5EA;
+  --gray-mid: #8E8E93;
+  --gray-dark2: #3A3A3C;
+  --gray-dark: #1C1C1E;
+  
   /* Glassmorphism Variables */
   /* Default to Dark Mode Variables (Graphite) */
   --glass-bg: rgba(20, 20, 22, 0.35);
@@ -41,6 +54,13 @@
   --orb-1: #E5E5E8;
   --orb-2: #DADADD;
   --orb-3: #F0F0F2;
+  
+  /* Apple Semantic Colors (Light Theme Variants) */
+  --color-primary: #007AFF;
+  --color-success: #34C759;
+  --color-warning: #FF9500;
+  --color-error: #FF3B30;
+  --color-caution: #FFCC00;
 }
 
 [data-theme='dark'] {
@@ -57,6 +77,13 @@
   --orb-1: #2A2A2E;
   --orb-2: #3A3A40;
   --orb-3: #1C1C20;
+  
+  /* Apple Semantic Colors (Dark Theme Variants) */
+  --color-primary: #007AFF;
+  --color-success: #34C759;
+  --color-warning: #FF9500;
+  --color-error: #FF3B30;
+  --color-caution: #FFCC00;
   
   font-synthesis: none;
   text-rendering: optimizeLegibility;
