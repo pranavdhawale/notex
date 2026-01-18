@@ -18,6 +18,13 @@ import TextAlign from "@tiptap/extension-text-align";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import "./Editor.css";
+import { FilesSidebar } from "./FilesSidebar";
+import { UsersSidebar } from "./UsersSidebar";
+import { Toolbar } from "./Toolbar";
+import { ThemeToggle } from "../components/ThemeToggle";
+import axios from "axios";
+import { Users, LogOut, Trash } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface EditorProps {
   roomSlug: string;
@@ -40,7 +47,28 @@ const cursorColors = [
 const TiptapEditor: React.FC<{
   provider: WebsocketProvider;
   userDetails: { name: string; color: string; userId: string };
-}> = ({ provider, userDetails }) => {
+  roomSlug: string;
+  status: string;
+  isOwner: boolean;
+  saving: boolean;
+  showUsers: boolean;
+  setShowUsers: (show: boolean) => void;
+  handleLeave: () => void;
+  handleDeleteRoom: () => void;
+  handleSave: () => void;
+}> = ({ 
+  provider, 
+  userDetails,
+  roomSlug,
+  status,
+  isOwner,
+  saving,
+  showUsers,
+  setShowUsers,
+  handleLeave,
+  handleDeleteRoom,
+  handleSave
+}) => {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -67,22 +95,102 @@ const TiptapEditor: React.FC<{
   });
 
   return (
-    <div className="editor-container" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Toolbar editor={editor} />
+    <div className="editor-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+         {/* Unified Sticky Header */}
+         <div className="sticky-header-glass">
+            {/* Single Liquid Glass Background */}
+            <div className="liquid-glass-container">
+              <div className="liquid-glass-backdrop"></div>
+              <div className="liquid-glass-distortion top"></div>
+              <div className="liquid-glass-distortion bottom"></div>
+              <div className="liquid-glass-distortion left"></div>
+              <div className="liquid-glass-distortion right"></div>
+            </div>
+
+            <div className="status-bar-row">
+              <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                <span className={`status-dot ${status === 'connected' ? 'online' : 'offline'}`}></span>
+                <span
+                  onClick={() => {
+                    navigator.clipboard.writeText(roomSlug);
+                    const el = document.getElementById("copy-feedback");
+                    if (el) {
+                      el.style.opacity = "1";
+                      setTimeout(() => (el.style.opacity = "0"), 2000);
+                    }
+                  }}
+                  style={{
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    color: "var(--text-main)"
+                  }}
+                  title="Click to copy room code"
+                >
+                  Room: {roomSlug}
+                </span>
+                <button
+                  onClick={handleLeave}
+                  className="btn-icon"
+                  title="Leave Room"
+                >
+                  <LogOut size={20} />
+                </button>
+                {isOwner && (
+                  <button
+                    onClick={handleDeleteRoom}
+                    className="btn-icon delete"
+                    title="Delete Room"
+                    style={{ color: '#ff4d4f' }}
+                  >
+                    <Trash size={20} />
+                  </button>
+                )}
+                <span
+                  id="copy-feedback"
+                  style={{
+                    opacity: 0,
+                    transition: "opacity 0.3s",
+                    color: "#4caf50",
+                    fontSize: "0.8em",
+                  }}
+                >
+                  Copied!
+                </span>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <ThemeToggle className="btn-icon" />
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="btn-primary"
+                  style={{ padding: "6px 12px", fontSize: "0.9rem" }}
+                >
+                  {saving ? "Saving..." : "Save Snapshot"}
+                </button>
+                <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', height: '24px', margin: '0 5px' }}></div>
+                <button 
+                  onClick={() => setShowUsers(!showUsers)}
+                  className="btn-icon"
+                  title="Toggle Users"
+                >
+                  <Users size={20} />
+                </button>
+              </div>
+            </div>
+
+            <Toolbar editor={editor} />
+         </div>
+
+        <EditorContent editor={editor} />
         <EditorContent editor={editor} />
       </div>
     </div>
   );
 };
 
-import { FilesSidebar } from "./FilesSidebar";
-import { UsersSidebar } from "./UsersSidebar";
-import { Toolbar } from "./Toolbar";
-import { ThemeToggle } from "../components/ThemeToggle";
-import axios from "axios";
-import { Users, LogOut, Trash } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+
 
 export const Editor: React.FC<EditorProps> = ({
   roomSlug,
@@ -284,78 +392,19 @@ export const Editor: React.FC<EditorProps> = ({
 
       {/* CENTER: EDITOR */}
       <div className="editor-main">
-        <div className="status-bar">
-          <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-             <span className={`status-dot ${status === 'connected' ? 'online' : 'offline'}`}></span>
-             <span
-              onClick={() => {
-                navigator.clipboard.writeText(roomSlug);
-                const el = document.getElementById("copy-feedback");
-                if (el) {
-                  el.style.opacity = "1";
-                  setTimeout(() => (el.style.opacity = "0"), 2000);
-                }
-              }}
-              style={{
-                cursor: "pointer",
-                fontWeight: 600,
-                color: "var(--text-main)"
-              }}
-              title="Click to copy room code"
-            >
-              Room: {roomSlug}
-            </span>
-            <button
-              onClick={handleLeave}
-              className="btn-icon"
-              title="Leave Room"
-            >
-              <LogOut size={20} />
-            </button>
-            {isOwner && (
-              <button
-                onClick={handleDeleteRoom}
-                className="btn-icon delete"
-                title="Delete Room"
-                style={{ color: '#ff4d4f' }}
-              >
-                <Trash size={20} />
-              </button>
-            )}
-            <span
-              id="copy-feedback"
-              style={{
-                opacity: 0,
-                transition: "opacity 0.3s",
-                color: "#4caf50",
-                fontSize: "0.8em",
-              }}
-            >
-              Copied!
-            </span>
-          </div>
-          
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <ThemeToggle className="btn-icon" />
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="btn-primary"
-              style={{ padding: "6px 12px", fontSize: "0.9rem" }}
-            >
-              {saving ? "Saving..." : "Save Snapshot"}
-            </button>
-            <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', height: '24px', margin: '0 5px' }}></div>
-            <button 
-              onClick={() => setShowUsers(!showUsers)}
-              className="btn-icon"
-              title="Toggle Users"
-            >
-              <Users size={20} />
-            </button>
-          </div>
-        </div>
-        <TiptapEditor provider={provider} userDetails={userDetails} />
+        <TiptapEditor 
+          provider={provider} 
+          userDetails={userDetails}
+          roomSlug={roomSlug}
+          status={status}
+          isOwner={isOwner}
+          saving={saving}
+          showUsers={showUsers}
+          setShowUsers={setShowUsers}
+          handleLeave={handleLeave}
+          handleDeleteRoom={handleDeleteRoom}
+          handleSave={handleSave}
+        />
       </div>
 
       {/* RIGHT SIDEBAR: USERS */}
