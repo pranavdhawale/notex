@@ -20,7 +20,9 @@
   box-shadow: var(--glass-shadow);
   border-radius: 20px;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
+  overflow: hidden; /* Important for containing the liquid glass */
+  position: relative; /* Context for absolute liquid glass */
+  isolation: isolate; /* Create new stacking context */
 }
 
 /* --- Left Panel (Files) --- */
@@ -30,8 +32,8 @@
 }
 
 .left-panel.dragging {
-  background: rgba(10, 132, 255, 0.2);
-  border-color: var(--accent-color);
+  background: rgba(0, 122, 255, 0.2);
+  border-color: var(--color-primary);
 }
 
 /* --- Right Panel (Users) --- */
@@ -50,13 +52,30 @@
 }
 
 /* --- Headers --- */
-.panel-header {
-  padding: 16px;
+.liquid-header {
+  /* Sidebar headers now use absolute positioning for liquid effect */
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px; /* FIXED HEIGHT for alignment */
+  padding: 0 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--glass-border);
-  background: rgba(255,255,255,0.05);
+  z-index: 20;
+  border-bottom: none; /* Border handled by liquid glass */
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.header-content {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .panel-header h3 {
@@ -89,16 +108,28 @@
   position: relative;
 }
 
-.editor-main .status-bar {
-  flex-shrink: 0;
+/* Unified Sticky Header */
+.sticky-header-glass {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  /* background managed by liquid-glass-container */
+}
+
+/* Status Bar Row (Layout Only) */
+.status-bar-row {
+  position: relative;
+  z-index: 10;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--glass-border);
+  /* Fixed height match sidebar */
+  height: 60px;
+  padding: 0 20px;
+  box-sizing: border-box;
 }
 
-.status-bar .btn-icon {
+.status-bar-row .btn-icon {
   width: 38px !important;
   height: 38px !important;
   aspect-ratio: 1/1 !important;
@@ -132,7 +163,8 @@
 
 /* Custom Scrollbar for editor wrapper */
 .editor-container > div::-webkit-scrollbar {
-  width: 8px;
+  width: 0px; /* Hide scrollbar */
+  background: transparent;
 }
 
 .editor-container > div::-webkit-scrollbar-track {
@@ -153,9 +185,16 @@
   flex: 1;
   overflow-y: auto;
   padding: 10px;
+  /* Push content down by header height + spacing */
+  padding-top: 70px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.files-list::-webkit-scrollbar {
+  width: 0;
+  background: transparent;
 }
 
 .file-item-glass {
@@ -242,9 +281,16 @@
   flex: 1;
   overflow-y: auto;
   padding: 10px;
+   /* Push content down by header height + spacing */
+   padding-top: 70px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.user-list::-webkit-scrollbar {
+  width: 0;
+  background: transparent;
 }
 
 .user-card {
@@ -282,7 +328,7 @@
 
 .user-status {
   font-size: 0.75rem;
-  color: #4caf50;
+  color: var(--color-success);
   display: flex;
   align-items: center;
 }
@@ -292,20 +338,84 @@
   display: inline-block;
   width: 6px;
   height: 6px;
-  background: #4caf50;
+  background: var(--color-success);
   border-radius: 50%;
   margin-right: 4px;
 }
 
 /* --- Toolbar (Circular) --- */
-.editor-toolbar-glass {
+.editor-toolbar-simple {
+  position: relative;
+  z-index: 10;
   display: flex;
   justify-content: center;
-  padding: 10px;
-  background: var(--glass-bg);
-  border-bottom: 1px solid var(--glass-border);
+  padding: 0 10px 15px 10px;
   gap: 12px;
   flex-wrap: wrap;
+  background: transparent;
+}
+
+/* Liquid Glass Effect Classes */
+.liquid-glass-container {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  height: 100%;
+  width: 100%;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.liquid-glass-backdrop {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15);
+}
+
+.liquid-glass-distortion {
+  position: absolute;
+  /* Inset slighty to avoid sampling outside edge */
+  left: 2px;
+  right: 2px;
+  height: 0.8rem;
+  width: auto;
+  -webkit-backdrop-filter: url(#distortion);
+  backdrop-filter: url(#distortion);
+  opacity: 0.7; /* Soften the effect */
+}
+
+.liquid-glass-distortion.top { 
+  top: 1px; 
+  left: 12px; /* Avoid corner overlap */
+  right: 12px;
+  width: auto;
+}
+.liquid-glass-distortion.bottom { 
+  bottom: 0px; 
+  left: 12px;
+  right: 12px;
+  width: auto;
+}
+.liquid-glass-distortion.left {
+  left: 1px;
+  top: 12px;
+  bottom: 12px;
+  width: 0.8rem;
+  height: auto;
+}
+.liquid-glass-distortion.right {
+  right: 0px;
+  left: auto;
+  top: 12px;
+  bottom: 12px;
+  width: 0.8rem;
+  height: auto;
 }
 
 .toolbar-btn-circle {
@@ -334,10 +444,10 @@
 }
 
 .toolbar-btn-circle.is-active {
-  background: var(--accent-color);
+  background: var(--color-primary);
   color: white;
   border-color: transparent;
-  box-shadow: 0 0 10px rgba(10, 132, 255, 0.4);
+  box-shadow: 0 0 10px rgba(0, 122, 255, 0.4);
 }
 
 .empty-state {
@@ -370,6 +480,6 @@
 }
 
 .btn-icon.delete:hover {
-  color: #ff4d4f;
-  background: rgba(255, 77, 79, 0.1);
+  color: var(--color-error);
+  background: rgba(255, 59, 48, 0.1);
 }
