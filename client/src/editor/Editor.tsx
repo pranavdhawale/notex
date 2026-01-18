@@ -23,7 +23,7 @@ import { UsersSidebar } from "./UsersSidebar";
 import { Toolbar } from "./Toolbar";
 import { ThemeToggle } from "../components/ThemeToggle";
 import axios from "axios";
-import { Users, LogOut, Trash } from "lucide-react";
+import { Users, LogOut, Trash, Save, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface EditorProps {
@@ -113,7 +113,7 @@ const TiptapEditor: React.FC<{
                 <span className={`status-dot ${status === 'connected' ? 'online' : 'offline'}`}></span>
                 <span
                   onClick={() => {
-                    navigator.clipboard.writeText(roomSlug);
+                    navigator.clipboard.writeText(window.location.href);
                     const el = document.getElementById("copy-feedback");
                     if (el) {
                       el.style.opacity = "1";
@@ -125,7 +125,7 @@ const TiptapEditor: React.FC<{
                     fontWeight: 600,
                     color: "var(--text-main)"
                   }}
-                  title="Click to copy room code"
+                  title="Click to copy room link"
                 >
                   Room: {roomSlug}
                 </span>
@@ -164,10 +164,11 @@ const TiptapEditor: React.FC<{
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="btn-primary"
-                  style={{ padding: "6px 12px", fontSize: "0.9rem" }}
+                  className="btn-icon"
+                  style={{ color: "var(--color-primary)" }}
+                  title={saving ? "Saving..." : "Save Snapshot"}
                 >
-                  {saving ? "Saving..." : "Save Snapshot"}
+                  {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
                 </button>
                 <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', height: '24px', margin: '0 5px' }}></div>
                 <button 
