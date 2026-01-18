@@ -1,5 +1,4 @@
 .env
-.rules
 node_modules/
 dist/
 bin/
