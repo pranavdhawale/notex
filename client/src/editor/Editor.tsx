@@ -56,8 +56,8 @@ const TiptapEditor: React.FC<{
   handleLeave: () => void;
   handleDeleteRoom: () => void;
   handleSave: () => void;
-}> = ({ 
-  provider, 
+}> = ({
+  provider,
   userDetails,
   roomSlug,
   status,
@@ -67,7 +67,7 @@ const TiptapEditor: React.FC<{
   setShowUsers,
   handleLeave,
   handleDeleteRoom,
-  handleSave
+  handleSave,
 }) => {
   const editor = useEditor({
     extensions: [
@@ -95,94 +95,115 @@ const TiptapEditor: React.FC<{
   });
 
   return (
-    <div className="editor-container" style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
-         {/* Unified Sticky Header */}
-         <div className="sticky-header-glass">
-            {/* Single Liquid Glass Background */}
-            <div className="liquid-glass-container">
-              <div className="liquid-glass-backdrop"></div>
-              <div className="liquid-glass-distortion top"></div>
-              <div className="liquid-glass-distortion bottom"></div>
-              <div className="liquid-glass-distortion left"></div>
-              <div className="liquid-glass-distortion right"></div>
+    <div
+      className="editor-container"
+      style={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+      }}
+    >
+      <div style={{ flex: 1, overflow: "auto", position: "relative" }}>
+        {/* Unified Sticky Header */}
+        <div className="sticky-header-glass">
+          {/* Single Liquid Glass Background */}
+          <div className="liquid-glass-container">
+            <div className="liquid-glass-backdrop"></div>
+            <div className="liquid-glass-distortion top"></div>
+            <div className="liquid-glass-distortion bottom"></div>
+            <div className="liquid-glass-distortion left"></div>
+            <div className="liquid-glass-distortion right"></div>
+          </div>
+
+          <div className="status-bar-row">
+            <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
+              <span
+                className={`status-dot ${status === "connected" ? "online" : "offline"}`}
+              ></span>
+              <span
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  const el = document.getElementById("copy-feedback");
+                  if (el) {
+                    el.style.opacity = "1";
+                    setTimeout(() => (el.style.opacity = "0"), 2000);
+                  }
+                }}
+                style={{
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  color: "var(--text-main)",
+                }}
+                title="Click to copy room link"
+              >
+                Room: {roomSlug}
+              </span>
+              <button
+                onClick={handleLeave}
+                className="btn-icon"
+                title="Leave Room"
+              >
+                <LogOut size={20} />
+              </button>
+              {isOwner && (
+                <button
+                  onClick={handleDeleteRoom}
+                  className="btn-icon delete"
+                  title="Delete Room"
+                  style={{ color: "#ff4d4f" }}
+                >
+                  <Trash size={20} />
+                </button>
+              )}
+              <span
+                id="copy-feedback"
+                style={{
+                  opacity: 0,
+                  transition: "opacity 0.3s",
+                  color: "#4caf50",
+                  fontSize: "0.8em",
+                }}
+              >
+                Copied!
+              </span>
             </div>
 
-            <div className="status-bar-row">
-              <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                <span className={`status-dot ${status === 'connected' ? 'online' : 'offline'}`}></span>
-                <span
-                  onClick={() => {
-                    navigator.clipboard.writeText(window.location.href);
-                    const el = document.getElementById("copy-feedback");
-                    if (el) {
-                      el.style.opacity = "1";
-                      setTimeout(() => (el.style.opacity = "0"), 2000);
-                    }
-                  }}
-                  style={{
-                    cursor: "pointer",
-                    fontWeight: 600,
-                    color: "var(--text-main)"
-                  }}
-                  title="Click to copy room link"
-                >
-                  Room: {roomSlug}
-                </span>
-                <button
-                  onClick={handleLeave}
-                  className="btn-icon"
-                  title="Leave Room"
-                >
-                  <LogOut size={20} />
-                </button>
-                {isOwner && (
-                  <button
-                    onClick={handleDeleteRoom}
-                    className="btn-icon delete"
-                    title="Delete Room"
-                    style={{ color: '#ff4d4f' }}
-                  >
-                    <Trash size={20} />
-                  </button>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <ThemeToggle className="btn-icon" />
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="btn-icon"
+                style={{ color: "var(--color-primary)" }}
+                title={saving ? "Saving..." : "Save Snapshot"}
+              >
+                {saving ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : (
+                  <Save size={20} />
                 )}
-                <span
-                  id="copy-feedback"
-                  style={{
-                    opacity: 0,
-                    transition: "opacity 0.3s",
-                    color: "#4caf50",
-                    fontSize: "0.8em",
-                  }}
-                >
-                  Copied!
-                </span>
-              </div>
-              
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <ThemeToggle className="btn-icon" />
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="btn-icon"
-                  style={{ color: "var(--color-primary)" }}
-                  title={saving ? "Saving..." : "Save Snapshot"}
-                >
-                  {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
-                </button>
-                <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', height: '24px', margin: '0 5px' }}></div>
-                <button 
-                  onClick={() => setShowUsers(!showUsers)}
-                  className="btn-icon"
-                  title="Toggle Users"
-                >
-                  <Users size={20} />
-                </button>
-              </div>
+              </button>
+              <div
+                style={{
+                  width: 1,
+                  background: "rgba(255,255,255,0.1)",
+                  height: "24px",
+                  margin: "0 5px",
+                }}
+              ></div>
+              <button
+                onClick={() => setShowUsers(!showUsers)}
+                className="btn-icon"
+                title="Toggle Users"
+              >
+                <Users size={20} />
+              </button>
             </div>
+          </div>
 
-            <Toolbar editor={editor} />
-         </div>
+          <Toolbar editor={editor} />
+        </div>
 
         <EditorContent editor={editor} />
         <EditorContent editor={editor} />
@@ -190,8 +211,6 @@ const TiptapEditor: React.FC<{
     </div>
   );
 };
-
-
 
 export const Editor: React.FC<EditorProps> = ({
   roomSlug,
@@ -214,12 +233,16 @@ export const Editor: React.FC<EditorProps> = ({
   };
 
   const handleDeleteRoom = async () => {
-    if (confirm("Are you sure you want to delete this room? ALL DATA WILL BE LOST.")) {
+    if (
+      confirm(
+        "Are you sure you want to delete this room? ALL DATA WILL BE LOST.",
+      )
+    ) {
       try {
         await axios.delete(
           `${
             import.meta.env.VITE_API_URL || "http://localhost:8080"
-          }/api/rooms/${roomSlug}`
+          }/api/rooms/${roomSlug}`,
         );
         navigate("/");
       } catch (e) {
@@ -253,7 +276,7 @@ export const Editor: React.FC<EditorProps> = ({
         const res = await axios.get(
           `${
             import.meta.env.VITE_API_URL || "http://localhost:8080"
-          }/api/rooms/${roomSlug}`
+          }/api/rooms/${roomSlug}`,
         );
 
         // Restore Snapshot if exists
@@ -290,7 +313,7 @@ export const Editor: React.FC<EditorProps> = ({
           await axios.get(
             `${
               import.meta.env.VITE_API_URL || "http://localhost:8080"
-            }/api/rooms/${roomSlug}`
+            }/api/rooms/${roomSlug}`,
           );
         } catch (e: any) {
           if (e.response && e.response.status === 404) {
@@ -314,7 +337,7 @@ export const Editor: React.FC<EditorProps> = ({
       const wsUrl =
         (import.meta.env.VITE_API_URL || "http://localhost:8080").replace(
           "http",
-          "ws"
+          "ws",
         ) + "/ws";
 
       provider = new WebsocketProvider(wsUrl, roomSlug, doc, {
@@ -324,8 +347,8 @@ export const Editor: React.FC<EditorProps> = ({
       provider.on("status", (event: any) => {
         setStatus(event.status);
         if (event.status === "connected" && provider) {
-           // Ensure we only set awareness when fully connected
-           provider.awareness.setLocalStateField("user", userDetails);
+          // Ensure we only set awareness when fully connected
+          provider.awareness.setLocalStateField("user", userDetails);
         }
       });
 
@@ -349,7 +372,26 @@ export const Editor: React.FC<EditorProps> = ({
     };
   }, [roomSlug, userDetails]);
 
-  const handleSave = async () => {
+  // Debounce helper
+  const useDebounce = (callback: (...args: any[]) => void, delay: number) => {
+    const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const debouncedCallback = React.useCallback(
+      (...args: any[]) => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+        timeoutRef.current = setTimeout(() => {
+          callback(...args);
+        }, delay);
+      },
+      [callback, delay],
+    );
+
+    return debouncedCallback;
+  };
+
+  const handleSave = async (silent = false) => {
     if (!ydoc) return;
     setSaving(true);
     try {
@@ -364,18 +406,35 @@ export const Editor: React.FC<EditorProps> = ({
           }/api/rooms/${roomSlug}/save`,
           {
             content: base64,
-          }
+          },
         );
-        alert("Saved!");
+        if (!silent) alert("Saved!");
       };
       reader.readAsDataURL(blob);
     } catch (e) {
       console.error(e);
-      alert("Failed to save");
+      if (!silent) alert("Failed to save");
     } finally {
-      setSaving(false);
+      // Keep "Saving..." indicator for a moment so user sees it
+      setTimeout(() => setSaving(false), 500);
     }
   };
+
+  const debouncedSave = useDebounce(() => handleSave(true), 2000);
+
+  // Auto-save on document update
+  useEffect(() => {
+    if (ydoc) {
+      const updateHandler = () => {
+        debouncedSave();
+        setSaving(true); // Immediate visual feedback
+      };
+      ydoc.on("update", updateHandler);
+      return () => {
+        ydoc.off("update", updateHandler);
+      };
+    }
+  }, [ydoc, debouncedSave]);
 
   if (!provider || !ydoc) {
     return <div className="editor-container">Initializing connection...</div>;
@@ -384,17 +443,17 @@ export const Editor: React.FC<EditorProps> = ({
   return (
     <div className="editor-layout">
       {/* LEFT SIDEBAR: FILES */}
-      <FilesSidebar 
-        roomSlug={roomSlug} 
-        ydoc={ydoc} 
-        userId={userId} 
-        isRoomOwner={isOwner} 
+      <FilesSidebar
+        roomSlug={roomSlug}
+        ydoc={ydoc}
+        userId={userId}
+        isRoomOwner={isOwner}
       />
 
       {/* CENTER: EDITOR */}
       <div className="editor-main">
-        <TiptapEditor 
-          provider={provider} 
+        <TiptapEditor
+          provider={provider}
           userDetails={userDetails}
           roomSlug={roomSlug}
           status={status}
@@ -404,15 +463,15 @@ export const Editor: React.FC<EditorProps> = ({
           setShowUsers={setShowUsers}
           handleLeave={handleLeave}
           handleDeleteRoom={handleDeleteRoom}
-          handleSave={handleSave}
+          handleSave={() => handleSave(false)}
         />
       </div>
 
       {/* RIGHT SIDEBAR: USERS */}
-      <UsersSidebar 
-        provider={provider} 
-        isOpen={showUsers} 
-        onClose={() => setShowUsers(false)} 
+      <UsersSidebar
+        provider={provider}
+        isOpen={showUsers}
+        onClose={() => setShowUsers(false)}
       />
     </div>
   );
