@@ -25,12 +25,12 @@ func main() {
 	}
 	state.InitMongo(mongoURI, "notex")
 
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "localhost:6379"
-	}
-	redisPassword := os.Getenv("REDIS_PASSWORD")
-	state.InitRedis(redisAddr, redisPassword)
+	//redisAddr := os.Getenv("REDIS_ADDR")
+	//if redisAddr == "" {
+	//	redisAddr = "localhost:6379"
+	//}
+	//redisPassword := os.Getenv("REDIS_PASSWORD")
+	//state.InitRedis(redisAddr, redisPassword)
 
 	r := gin.Default()
 	
