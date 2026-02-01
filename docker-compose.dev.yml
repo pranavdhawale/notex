@@ -1,0 +1,56 @@
+services:
+  # Database Services
+  mongo:
+    image: bitnami/mongodb:latest
+    container_name: notex-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/bitnami/mongodb
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    networks:
+      - notex-dev-net
+
+  # Backend Service
+  server:
+    build:
+      context: ./server
+      target: development
+    container_name: notex-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./server:/app # Mount source for hot reloading
+    environment:
+      - PORT=8080
+      - GIN_MODE=debug
+      - MONGO_URI=mongodb://mongo:27017
+      - CLIENT_ORIGIN=http://localhost:5173
+    depends_on:
+      - mongo
+    networks:
+      - notex-dev-net
+
+  # Frontend Service
+  client:
+    build:
+      context: ./client
+      target: development
+    container_name: notex-client
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app # Mount source for hot reloading
+      - /app/node_modules # Prevent host node_modules from overwriting container's
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    networks:
+      - notex-dev-net
+
+volumes:
+  mongo_data:
+
+networks:
+  notex-dev-net:
+    driver: bridge

@@ -35,5 +35,3 @@ networks:
     external: true
   internal:
     external: true
-
-
