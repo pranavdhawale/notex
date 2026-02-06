@@ -9,6 +9,8 @@ services:
       - "8080"
     env_file:
       - /srv/docker/secrets/notex.env
+    environment:
+      - TZ=Asia/Kolkata
     networks:
       - internal
     volumes:
@@ -21,6 +23,8 @@ services:
       args:
         - VITE_API_URL=${VITE_API_URL}
     container_name: notex-client
+    environment:
+      - TZ=Asia/Kolkata
     restart: unless-stopped
     expose:
       - "80"

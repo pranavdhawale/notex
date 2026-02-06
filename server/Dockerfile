@@ -18,6 +18,7 @@ RUN go build -o notex-server ./main.go
 
 # Stage 4: Production
 FROM alpine:latest AS production
+RUN apk add --no-cache tzdata
 WORKDIR /app
 COPY --from=builder /app/notex-server .
 EXPOSE 8080
