@@ -11,7 +11,6 @@ interface AccessLog {
 }
 
 export class SmartCacheManager {
-  private maxRooms = 20;
   private maxSize = 5 * 1024 * 1024; // 5MB
   private readonly prefix = "notex_room_";
   private readonly accessLogKey = "notex_access_log";
