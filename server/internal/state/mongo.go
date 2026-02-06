@@ -43,35 +43,28 @@ func InitMongo(uri string, dbName string) {
 		// Success!
 		MongoClient = client
 		MongoDatabase = client.Database(dbName)
+		
+		// Create TTL Index for Dynamic Expiration
+		roomsCollection := MongoDatabase.Collection("rooms")
+		indexModel := mongo.IndexModel{
+			Keys: bson.M{"expire_at": 1},
+			Options: options.Index().SetExpireAfterSeconds(0), // Expire exactly at the time specified in expire_at
+		}
+		
+		indexCtx, indexCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		_, err = roomsCollection.Indexes().CreateOne(indexCtx, indexModel)
+		indexCancel()
+		
+		if err != nil {
+			log.Printf("Failed to create TTL index: %v", err)
+		} else {
+			log.Println("TTL Index created on rooms.expire_at")
+		}
+		
 		log.Println("Connected to MongoDB")
 		return
 	}
 
-<<<<<<< Updated upstream
-	err = client.Ping(ctx, nil)
-	if err != nil {
-		log.Fatalf("Failed to ping Mongo: %v", err)
-	}
-
-	MongoClient = client
-	MongoDatabase = client.Database(dbName)
-	
-	// Create TTL Index for Dynamic Expiration
-	roomsCollection := MongoDatabase.Collection("rooms")
-	indexModel := mongo.IndexModel{
-		Keys: bson.M{"expire_at": 1},
-		Options: options.Index().SetExpireAfterSeconds(0), // Expire exactly at the time specified in expire_at
-	}
-	_, err = roomsCollection.Indexes().CreateOne(ctx, indexModel)
-	if err != nil {
-		log.Printf("Failed to create TTL index: %v", err)
-	} else {
-		log.Println("TTL Index created on rooms.expire_at")
-	}
-
-	log.Println("Connected to MongoDB")
-=======
 	// All retries exhausted
 	log.Fatalf("Failed to connect to MongoDB after %d attempts: %v", maxRetries, err)
->>>>>>> Stashed changes
 }
