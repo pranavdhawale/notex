@@ -14,14 +14,40 @@ var MongoClient *mongo.Client
 var MongoDatabase *mongo.Database
 
 func InitMongo(uri string, dbName string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	maxRetries := 30
+	retryDelay := 2 * time.Second
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
-	if err != nil {
-		log.Fatalf("Failed to create Mongo client: %v", err)
+	var client *mongo.Client
+	var err error
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		
+		client, err = mongo.Connect(ctx, options.Client().ApplyURI(uri))
+		if err != nil {
+			cancel()
+			log.Printf("Failed to create Mongo client (attempt %d/%d): %v", attempt, maxRetries, err)
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		err = client.Ping(ctx, nil)
+		cancel()
+		
+		if err != nil {
+			log.Printf("Failed to ping Mongo (attempt %d/%d): %v", attempt, maxRetries, err)
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		// Success!
+		MongoClient = client
+		MongoDatabase = client.Database(dbName)
+		log.Println("Connected to MongoDB")
+		return
 	}
 
+<<<<<<< Updated upstream
 	err = client.Ping(ctx, nil)
 	if err != nil {
 		log.Fatalf("Failed to ping Mongo: %v", err)
@@ -44,4 +70,8 @@ func InitMongo(uri string, dbName string) {
 	}
 
 	log.Println("Connected to MongoDB")
+=======
+	// All retries exhausted
+	log.Fatalf("Failed to connect to MongoDB after %d attempts: %v", maxRetries, err)
+>>>>>>> Stashed changes
 }
