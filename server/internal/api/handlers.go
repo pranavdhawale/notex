@@ -26,9 +26,9 @@ type CreateRoomRequest struct {
 // Helper to calculate expiration based on content
 func calculateExpiry(hasContent bool) time.Time {
 	if hasContent {
-		return time.Now().Add(2 * time.Minute) // 2 Minutes for testing
+		return time.Now().Add(7 * 24 * time.Hour) // 7 Days
 	}
-	return time.Now().Add(1 * time.Minute) // 1 Minute for testing
+	return time.Now().Add(24 * time.Hour) // 1 Day
 }
 
 func CreateRoom(c *gin.Context) {
