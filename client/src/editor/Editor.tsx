@@ -25,6 +25,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import axios from "axios";
 import { Users, LogOut, Trash, Save, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { cacheManager } from "../utils/SmartCacheManager";
 
 interface EditorProps {
   roomSlug: string;
@@ -244,6 +245,11 @@ export const Editor: React.FC<EditorProps> = ({
             import.meta.env.VITE_API_URL || "http://localhost:8080"
           }/api/rooms/${roomSlug}`,
         );
+
+        // Clear cache for this room
+        cacheManager.remove(roomSlug);
+        console.log("🗑️ Cleared cache for deleted room");
+
         navigate("/");
       } catch (e) {
         alert("Failed to delete room");
@@ -269,9 +275,38 @@ export const Editor: React.FC<EditorProps> = ({
     localStorage.setItem("notex_show_users", String(showUsers));
   }, [showUsers]);
 
-  // Load Snapshot and Check Room
+  // Auto-save to SmartCache on document update
+  useEffect(() => {
+    if (ydoc) {
+      const updateHandler = () => {
+        const stateVector = Y.encodeStateAsUpdate(ydoc);
+        cacheManager.save(roomSlug, stateVector);
+      };
+      ydoc.on("update", updateHandler);
+      return () => {
+        ydoc.off("update", updateHandler);
+      };
+    }
+  }, [ydoc, roomSlug]);
+
+  // Initial Load from SmartCache OR Server
   useEffect(() => {
     const fetchRoomData = async () => {
+      if (!ydoc) return;
+
+      // 1. Try SmartCache First
+      const cached = cacheManager.load(roomSlug);
+      if (cached) {
+        try {
+          Y.applyUpdate(ydoc, cached);
+          console.log("✅ Restored from SmartCache (compressed)");
+          return; // Skip server fetch if we have local data
+        } catch (e) {
+          console.error("Failed to apply cached update:", e);
+        }
+      }
+
+      // 2. Fetch from Server (Snapshot) if no local data
       try {
         const res = await axios.get(
           `${
@@ -279,10 +314,8 @@ export const Editor: React.FC<EditorProps> = ({
           }/api/rooms/${roomSlug}`,
         );
 
-        // Restore Snapshot if exists
         if (res.data.content && ydoc) {
           try {
-            // Decode base64 to Uint8Array through binary string
             const binaryString = window.atob(res.data.content);
             const len = binaryString.length;
             const bytes = new Uint8Array(len);
@@ -290,7 +323,7 @@ export const Editor: React.FC<EditorProps> = ({
               bytes[i] = binaryString.charCodeAt(i);
             }
             Y.applyUpdate(ydoc, bytes);
-            console.log("Snapshot loaded");
+            console.log("📥 Snapshot loaded from Server");
           } catch (err) {
             console.error("Failed to load snapshot", err);
           }
@@ -372,25 +405,6 @@ export const Editor: React.FC<EditorProps> = ({
     };
   }, [roomSlug, userDetails]);
 
-  // Debounce helper
-  const useDebounce = (callback: (...args: any[]) => void, delay: number) => {
-    const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    const debouncedCallback = React.useCallback(
-      (...args: any[]) => {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-        timeoutRef.current = setTimeout(() => {
-          callback(...args);
-        }, delay);
-      },
-      [callback, delay],
-    );
-
-    return debouncedCallback;
-  };
-
   const handleSave = async (silent = false) => {
     if (!ydoc) return;
     setSaving(true);
@@ -419,22 +433,6 @@ export const Editor: React.FC<EditorProps> = ({
       setTimeout(() => setSaving(false), 500);
     }
   };
-
-  const debouncedSave = useDebounce(() => handleSave(true), 2000);
-
-  // Auto-save on document update
-  useEffect(() => {
-    if (ydoc) {
-      const updateHandler = () => {
-        debouncedSave();
-        setSaving(true); // Immediate visual feedback
-      };
-      ydoc.on("update", updateHandler);
-      return () => {
-        ydoc.off("update", updateHandler);
-      };
-    }
-  }, [ydoc, debouncedSave]);
 
   if (!provider || !ydoc) {
     return <div className="editor-container">Initializing connection...</div>;

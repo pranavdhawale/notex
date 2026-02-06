@@ -22,6 +22,15 @@ type CreateRoomRequest struct {
 	Owner      string `json:"owner"`
 }
 
+
+// Helper to calculate expiration based on content
+func calculateExpiry(hasContent bool) time.Time {
+	if hasContent {
+		return time.Now().Add(2 * time.Minute) // 2 Minutes for testing
+	}
+	return time.Now().Add(1 * time.Minute) // 1 Minute for testing
+}
+
 func CreateRoom(c *gin.Context) {
 	var req CreateRoomRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -40,6 +49,7 @@ func CreateRoom(c *gin.Context) {
 		Slug:      slug,
 		Owner:     req.Owner,
 		CreatedAt: time.Now(),
+		ExpireAt:  calculateExpiry(false), // Initially empty, expires in 24h
 	}
 
 	collection := state.MongoDatabase.Collection("rooms")
@@ -73,6 +83,27 @@ func GetRoom(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
+
+	// Refresh Expiration (Smart TTL)
+	hasContent := false
+	if room.Content != nil {
+		// Check if content is empty string if it's a string, or just nil check
+		// Currently Content is interface{}, usually string(base64) or map
+		// Let's assume non-nil means content for now, or check empty string
+		if s, ok := room.Content.(string); ok && s != "" {
+			hasContent = true
+		} else if room.Content != nil {
+			hasContent = true // Non-string content
+		}
+	}
+	
+	newExpiry := calculateExpiry(hasContent)
+	// Update ExpireAt in background (don't block read)
+	go func(s string, t time.Time) {
+		bgCtx, bgCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer bgCancel()
+		_, _ = collection.UpdateOne(bgCtx, bson.M{"slug": s}, bson.M{"$set": bson.M{"expire_at": t}})
+	}(slug, newExpiry)
 
 	c.JSON(http.StatusOK, room)
 }
@@ -124,17 +155,18 @@ func SaveRoom(c *gin.Context) {
 	// Use Upsert: true so ad-hoc rooms (like demo-room) are created on save
 	opts := options.Update().SetUpsert(true)
 	filter := bson.M{"slug": slug}
+	
+	// Saving implies content exists -> 7 Days TTL
+	newExpiry := calculateExpiry(true)
+	
 	update := bson.M{
 		"$set": bson.M{
-			"content": req.Content,
-			// If we are creating it now, we should probably set owner/created_at too only on insert?
-			// But $set overwrites.
-			// Let's use $setOnInsert for static fields if we want, but simple $set is fine for MVP.
-			// We might overwrite Owner if we don't handle it, but for now it's okay.
+			"content":   req.Content,
+			"expire_at": newExpiry,
 		},
 		"$setOnInsert": bson.M{
 			"created_at": time.Now(),
-			"owner": "anon_save", // Fallback owner
+			"owner":      "anon_save", // Fallback owner
 		},
 	}
 
