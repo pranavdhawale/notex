@@ -26,6 +26,7 @@ import axios from "axios";
 import { Users, LogOut, Trash, Save, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cacheManager } from "../utils/SmartCacheManager";
+import { NotFoundView } from "../components/NotFoundView";
 
 interface EditorProps {
   roomSlug: string;
@@ -222,6 +223,7 @@ export const Editor: React.FC<EditorProps> = ({
   const [status, setStatus] = useState("connecting");
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const [saving, setSaving] = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const [showUsers, setShowUsers] = useState(() => {
     const saved = localStorage.getItem("notex_show_users");
     return saved === null ? true : saved === "true";
@@ -335,7 +337,11 @@ export const Editor: React.FC<EditorProps> = ({
           }
         }
       } catch (e: any) {
-        // Room check moved here for efficiency? No, separate effect handles disconnect.
+        if (e.response && e.response.status === 404) {
+          setNotFound(true);
+          return;
+        }
+        // Other errors (e.g. network) just fail silently for now or retry
       }
     };
 
@@ -356,8 +362,7 @@ export const Editor: React.FC<EditorProps> = ({
           );
         } catch (e: any) {
           if (e.response && e.response.status === 404) {
-            alert("Room deleted by owner.");
-            window.location.href = "/";
+            setNotFound(true);
           }
         }
       };
@@ -439,6 +444,10 @@ export const Editor: React.FC<EditorProps> = ({
       setTimeout(() => setSaving(false), 500);
     }
   };
+
+  if (notFound) {
+    return <NotFoundView />;
+  }
 
   if (!provider || !ydoc) {
     return <div className="editor-container">Initializing connection...</div>;
