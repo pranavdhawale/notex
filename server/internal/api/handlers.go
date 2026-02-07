@@ -152,8 +152,8 @@ func SaveRoom(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Use Upsert: true so ad-hoc rooms (like demo-room) are created on save
-	opts := options.Update().SetUpsert(true)
+	// Use Upsert: false to prevent creating rooms on save if they don't exist
+	opts := options.Update().SetUpsert(false)
 	filter := bson.M{"slug": slug}
 	
 	// Saving implies content exists -> 7 Days TTL
@@ -164,15 +164,16 @@ func SaveRoom(c *gin.Context) {
 			"content":   req.Content,
 			"expire_at": newExpiry,
 		},
-		"$setOnInsert": bson.M{
-			"created_at": time.Now(),
-			"owner":      "anon_save", // Fallback owner
-		},
 	}
 
-	_, err := collection.UpdateOne(ctx, filter, update, opts)
+	result, err := collection.UpdateOne(ctx, filter, update, opts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save room"})
+		return
+	}
+
+	if result.MatchedCount == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
 		return
 	}
 
