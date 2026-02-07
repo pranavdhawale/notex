@@ -207,7 +207,6 @@ const TiptapEditor: React.FC<{
         </div>
 
         <EditorContent editor={editor} />
-        <EditorContent editor={editor} />
       </div>
     </div>
   );
@@ -275,16 +274,23 @@ export const Editor: React.FC<EditorProps> = ({
     localStorage.setItem("notex_show_users", String(showUsers));
   }, [showUsers]);
 
-  // Auto-save to SmartCache on document update
+  // Auto-save to SmartCache on document update (Debounced 2s)
   useEffect(() => {
     if (ydoc) {
+      let timeoutId: ReturnType<typeof setTimeout>;
+
       const updateHandler = () => {
-        const stateVector = Y.encodeStateAsUpdate(ydoc);
-        cacheManager.save(roomSlug, stateVector);
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          const stateVector = Y.encodeStateAsUpdate(ydoc);
+          cacheManager.save(roomSlug, stateVector);
+        }, 2000);
       };
+
       ydoc.on("update", updateHandler);
       return () => {
         ydoc.off("update", updateHandler);
+        clearTimeout(timeoutId);
       };
     }
   }, [ydoc, roomSlug]);
