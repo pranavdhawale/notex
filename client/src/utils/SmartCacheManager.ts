@@ -2,41 +2,35 @@ import pako from "pako";
 
 interface CacheEntry {
   data: string;
-  timestamp: number;
   size: number;
 }
 
-interface AccessLog {
-  [roomSlug: string]: number;
-}
-
 export class SmartCacheManager {
-  private maxSize = 5 * 1024 * 1024; // 5MB
   private readonly prefix = "notex_room_";
-  private readonly accessLogKey = "notex_access_log";
 
   /**
-   * Save room data to localStorage with compression
+   * Save room data to sessionStorage with compression
+   * Stores content string (JSON) instead of binary
    */
-  save(roomSlug: string, data: Uint8Array): void {
+  save(roomSlug: string, content: string): void {
     try {
-      // Compress data using gzip
-      const compressed = pako.deflate(data);
+      // Compress string data using gzip
+      const compressed = pako.deflate(content);
+      // Convert Uint8Array to base64 string for storage
       const base64 = btoa(String.fromCharCode(...compressed));
 
       const entry: CacheEntry = {
         data: base64,
-        timestamp: Date.now(),
         size: base64.length,
       };
 
-      localStorage.setItem(`${this.prefix}${roomSlug}`, JSON.stringify(entry));
-      this.updateAccessLog(roomSlug);
+      sessionStorage.setItem(
+        `${this.prefix}${roomSlug}`,
+        JSON.stringify(entry),
+      );
     } catch (e: any) {
       if (e.name === "QuotaExceededError") {
-        console.warn("LocalStorage quota exceeded, evicting oldest room...");
-        this.evictOldest();
-        this.save(roomSlug, data); // Retry after eviction
+        console.warn("SessionStorage quota exceeded! Cannot save room cache.");
       } else {
         console.error("Failed to save to cache:", e);
       }
@@ -44,11 +38,12 @@ export class SmartCacheManager {
   }
 
   /**
-   * Load room data from localStorage with decompression
+   * Load room data from sessionStorage with decompression
+   * Returns content string (JSON)
    */
-  load(roomSlug: string): Uint8Array | null {
+  load(roomSlug: string): string | null {
     try {
-      const item = localStorage.getItem(`${this.prefix}${roomSlug}`);
+      const item = sessionStorage.getItem(`${this.prefix}${roomSlug}`);
       if (!item) return null;
 
       const entry: CacheEntry = JSON.parse(item);
@@ -61,12 +56,7 @@ export class SmartCacheManager {
       }
 
       // Decompress
-      const decompressed = pako.inflate(compressed);
-
-      // Update access log
-      this.updateAccessLog(roomSlug);
-
-      return decompressed;
+      return pako.inflate(compressed, { to: "string" });
     } catch (e) {
       console.error(`Failed to load cache for room ${roomSlug}:`, e);
       // Remove corrupted cache entry
@@ -79,13 +69,7 @@ export class SmartCacheManager {
    * Remove a specific room from cache
    */
   remove(roomSlug: string): void {
-    localStorage.removeItem(`${this.prefix}${roomSlug}`);
-
-    // Also remove from access log
-    const log = this.getAccessLog();
-    delete log[roomSlug];
-    localStorage.setItem(this.accessLogKey, JSON.stringify(log));
-
+    sessionStorage.removeItem(`${this.prefix}${roomSlug}`);
     console.log(`🗑️ Removed room from cache: ${roomSlug}`);
   }
 
@@ -93,11 +77,11 @@ export class SmartCacheManager {
    * Clear all cached rooms
    */
   clearAll(): void {
-    const rooms = this.getAllRooms();
-    rooms.forEach((room) => {
-      localStorage.removeItem(`${this.prefix}${room.slug}`);
+    Object.keys(sessionStorage).forEach((key) => {
+      if (key.startsWith(this.prefix)) {
+        sessionStorage.removeItem(key);
+      }
     });
-    localStorage.removeItem(this.accessLogKey);
     console.log("🗑️ Cleared all room caches");
   }
 
@@ -112,28 +96,11 @@ export class SmartCacheManager {
       roomCount: rooms.length,
       totalSize,
       totalSizeMB: (totalSize / (1024 * 1024)).toFixed(2),
-      percentUsed: ((totalSize / this.maxSize) * 100).toFixed(1),
       rooms: rooms.map((r) => ({
         slug: r.slug,
         sizeMB: (r.size / (1024 * 1024)).toFixed(2),
-        lastAccessed: new Date(r.timestamp),
       })),
     };
-  }
-
-  /**
-   * Evict the oldest (least recently used) room
-   */
-  private evictOldest(): void {
-    const rooms = this.getAllRooms();
-    if (rooms.length === 0) return;
-
-    // Sort by timestamp (oldest first)
-    rooms.sort((a, b) => a.timestamp - b.timestamp);
-    const oldest = rooms[0];
-
-    this.remove(oldest.slug);
-    console.log(`🗑️ Evicted oldest room: ${oldest.slug}`);
   }
 
   /**
@@ -142,11 +109,11 @@ export class SmartCacheManager {
   private getAllRooms(): Array<{ slug: string } & CacheEntry> {
     const rooms: Array<{ slug: string } & CacheEntry> = [];
 
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
       if (key && key.startsWith(this.prefix)) {
         const slug = key.replace(this.prefix, "");
-        const item = localStorage.getItem(key);
+        const item = sessionStorage.getItem(key);
         if (item) {
           try {
             const entry: CacheEntry = JSON.parse(item);
@@ -159,23 +126,6 @@ export class SmartCacheManager {
     }
 
     return rooms;
-  }
-
-  /**
-   * Update access log for LRU tracking
-   */
-  private updateAccessLog(roomSlug: string): void {
-    const log = this.getAccessLog();
-    log[roomSlug] = Date.now();
-    localStorage.setItem(this.accessLogKey, JSON.stringify(log));
-  }
-
-  /**
-   * Get access log
-   */
-  private getAccessLog(): AccessLog {
-    const log = localStorage.getItem(this.accessLogKey);
-    return log ? JSON.parse(log) : {};
   }
 }
 
