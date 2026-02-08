@@ -2,7 +2,10 @@ package utils
 
 import (
 	"context"
+	"errors"
 	"math/rand"
+	"regexp"
+	"strings"
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
@@ -46,3 +49,40 @@ func GenerateUniqueSlug(ctx context.Context, collection *mongo.Collection) (stri
 	// This should be extremely rare with ~10,000 combinations
 	return "", mongo.ErrNoDocuments
 }
+
+// ValidateCustomSlug validates user-provided slug
+// Returns error if invalid
+func ValidateCustomSlug(slug string) error {
+	// Check empty
+	if slug == "" {
+		return errors.New("slug cannot be empty")
+	}
+
+	// Check length
+	if len(slug) > 50 {
+		return errors.New("slug too long (max 50 characters)")
+	}
+
+	// Check format: lowercase alphanumeric + hyphens
+	// Pattern: word or word-word (no leading/trailing hyphens, no consecutive hyphens)
+	matched, _ := regexp.MatchString("^[a-z0-9]+(-[a-z0-9]+)?$", slug)
+	if !matched {
+		return errors.New("slug must be lowercase alphanumeric with optional single hyphen")
+	}
+
+	// Count words (split by hyphen)
+	words := strings.Split(slug, "-")
+	if len(words) > 2 {
+		return errors.New("slug can have maximum 2 words")
+	}
+
+	// Check minimum word length (at least 2 characters per word)
+	for _, word := range words {
+		if len(word) < 2 {
+			return errors.New("each word must be at least 2 characters")
+		}
+	}
+
+	return nil
+}
+
