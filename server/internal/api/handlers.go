@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/pranavdhawale/notex/server/internal/models"
 	"github.com/pranavdhawale/notex/server/internal/state"
+	"github.com/pranavdhawale/notex/server/internal/utils"
 	"github.com/pranavdhawale/notex/server/internal/ws"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -18,8 +18,7 @@ import (
 )
 
 type CreateRoomRequest struct {
-	SlugPrefix string `json:"slugPrefix"`
-	Owner      string `json:"owner"`
+	Owner string `json:"owner"`
 }
 
 
@@ -38,11 +37,16 @@ func CreateRoom(c *gin.Context) {
 		return
 	}
 
-	// Generate slug: prefix + random suffix
-	suffix := uuid.New().String()[:8]
-	slug := req.SlugPrefix + "-" + suffix
-	if req.SlugPrefix == "" {
-		slug = "room-" + suffix
+	collection := state.MongoDatabase.Collection("rooms")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Generate human-friendly unique slug
+	slug, err := utils.GenerateUniqueSlug(ctx, collection)
+	if err != nil {
+		log.Printf("Failed to generate unique slug: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create room"})
+		return
 	}
 
 	room := models.Room{
@@ -52,11 +56,7 @@ func CreateRoom(c *gin.Context) {
 		ExpireAt:  calculateExpiry(false), // Initially empty, expires in 24h
 	}
 
-	collection := state.MongoDatabase.Collection("rooms")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err := collection.InsertOne(ctx, room)
+	_, err = collection.InsertOne(ctx, room)
 	if err != nil {
 		log.Printf("Failed to insert room: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create room"})
