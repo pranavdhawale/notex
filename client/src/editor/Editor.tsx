@@ -58,6 +58,7 @@ const TiptapEditor: React.FC<{
   handleLeave: () => void;
   handleDeleteRoom: () => void;
   handleSave: () => void;
+  initialContent: any; // Add initial content prop
 }> = ({
   provider,
   userDetails,
@@ -70,7 +71,10 @@ const TiptapEditor: React.FC<{
   handleLeave,
   handleDeleteRoom,
   handleSave,
+  initialContent,
 }) => {
+  const [debouncer, setDebouncer] = useState<ReturnType<typeof setTimeout>>();
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -94,7 +98,24 @@ const TiptapEditor: React.FC<{
       TableCell,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
     ],
+    content: initialContent,
+    onUpdate: ({ editor }) => {
+      // Debounced save to SessionStorage (JSON content)
+      if (debouncer) clearTimeout(debouncer);
+      const timer = setTimeout(() => {
+        const json = JSON.stringify(editor.getJSON());
+        cacheManager.save(roomSlug, json);
+      }, 2000);
+      setDebouncer(timer);
+    },
   });
+
+  // Cleanup debouncer
+  useEffect(() => {
+    return () => {
+      if (debouncer) clearTimeout(debouncer);
+    };
+  }, [debouncer]);
 
   return (
     <div
@@ -224,6 +245,7 @@ export const Editor: React.FC<EditorProps> = ({
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [initialContent, setInitialContent] = useState<any>(null); // State for initial content
   const [showUsers, setShowUsers] = useState(() => {
     const saved = localStorage.getItem("notex_show_users");
     return saved === null ? true : saved === "true";
@@ -276,41 +298,24 @@ export const Editor: React.FC<EditorProps> = ({
     localStorage.setItem("notex_show_users", String(showUsers));
   }, [showUsers]);
 
-  // Auto-save to SmartCache on document update (Debounced 2s)
-  useEffect(() => {
-    if (ydoc) {
-      let timeoutId: ReturnType<typeof setTimeout>;
-
-      const updateHandler = () => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          const stateVector = Y.encodeStateAsUpdate(ydoc);
-          cacheManager.save(roomSlug, stateVector);
-        }, 2000);
-      };
-
-      ydoc.on("update", updateHandler);
-      return () => {
-        ydoc.off("update", updateHandler);
-        clearTimeout(timeoutId);
-      };
-    }
-  }, [ydoc, roomSlug]);
-
   // Initial Load from SmartCache OR Server
   useEffect(() => {
     const fetchRoomData = async () => {
       if (!ydoc) return;
 
-      // 1. Try SmartCache First
+      // 1. Try SmartCache First (SessionStorage - JSON)
       const cached = cacheManager.load(roomSlug);
       if (cached) {
         try {
-          Y.applyUpdate(ydoc, cached);
-          console.log("✅ Restored from SmartCache (compressed)");
-          return; // Skip server fetch if we have local data
+          const jsonContent = JSON.parse(cached);
+          setInitialContent(jsonContent);
+          console.log("✅ Restored from SessionStorage (JSON)");
+          // We don't return here because we still might want to fetch server snapshot if needed,
+          // OR rely on Yjs sync.
+          // For now, if we have local cache, we trust it for the *initial* view.
+          return;
         } catch (e) {
-          console.error("Failed to apply cached update:", e);
+          console.error("Failed to parse cached content:", e);
         }
       }
 
@@ -477,6 +482,7 @@ export const Editor: React.FC<EditorProps> = ({
           handleLeave={handleLeave}
           handleDeleteRoom={handleDeleteRoom}
           handleSave={() => handleSave(false)}
+          initialContent={initialContent}
         />
       </div>
 
