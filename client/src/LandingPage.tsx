@@ -9,6 +9,7 @@ export const LandingPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showAnimation, setShowAnimation] = useState(true);
   const [joinRoomCode, setJoinRoomCode] = useState("");
+  const [customSlug, setCustomSlug] = useState("");
   const [username, setUsername] = useState(
     localStorage.getItem("notex_username") || "",
   );
@@ -65,17 +66,25 @@ export const LandingPage: React.FC = () => {
 
     setLoading(true);
     try {
+      const payload: any = {
+        owner: getUserId(),
+      };
+
+      // Add custom slug if provided
+      if (customSlug.trim()) {
+        payload.customSlug = customSlug.trim().toLowerCase();
+      }
+
       const res = await axios.post(
         `${import.meta.env.VITE_API_URL || "http://localhost:8080"}/api/rooms`,
-        {
-          owner: getUserId(), // Send unique ID as owner
-        },
+        payload,
       );
       const room = res.data;
       navigate(`/${room.slug}`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to create room");
+      const errorMsg = err.response?.data?.error || "Failed to create room";
+      alert(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -121,6 +130,40 @@ export const LandingPage: React.FC = () => {
               onChange={(e) => setUsername(e.target.value)}
               className="glass-input"
             />
+          </div>
+
+          <div
+            className="input-group"
+            style={{ marginTop: "8px", marginBottom: "8px" }}
+          >
+            <label
+              style={{ fontSize: "0.85em", marginBottom: "4px", opacity: 0.8 }}
+            >
+              Room Name (Optional)
+            </label>
+            <input
+              type="text"
+              placeholder="e.g., my-project"
+              value={customSlug}
+              onChange={(e) => setCustomSlug(e.target.value)}
+              className="glass-input"
+              style={{
+                fontSize: "0.85em",
+                padding: "8px 12px",
+                height: "38px",
+              }}
+            />
+            <small
+              style={{
+                color: "var(--text-secondary)",
+                fontSize: "0.7em",
+                marginTop: "2px",
+                display: "block",
+                opacity: 0.7,
+              }}
+            >
+              Max 2 words • Leave empty for auto-generated
+            </small>
           </div>
 
           <div className="actions">

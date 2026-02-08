@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,7 +19,8 @@ import (
 )
 
 type CreateRoomRequest struct {
-	Owner string `json:"owner"`
+	Owner      string  `json:"owner"`
+	CustomSlug *string `json:"customSlug,omitempty"` // Optional custom slug
 }
 
 
@@ -41,12 +43,40 @@ func CreateRoom(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Generate human-friendly unique slug
-	slug, err := utils.GenerateUniqueSlug(ctx, collection)
-	if err != nil {
-		log.Printf("Failed to generate unique slug: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create room"})
-		return
+	var slug string
+	var err error
+
+	// If user provided custom slug, validate and use it
+	if req.CustomSlug != nil && *req.CustomSlug != "" {
+		customSlug := strings.ToLower(strings.TrimSpace(*req.CustomSlug))
+
+		// Validate format
+		if err := utils.ValidateCustomSlug(customSlug); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Check if already exists
+		count, err := collection.CountDocuments(ctx, bson.M{"slug": customSlug})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check slug availability"})
+			return
+		}
+
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Room slug already taken"})
+			return
+		}
+
+		slug = customSlug
+	} else {
+		// Auto-generate 2-word slug
+		slug, err = utils.GenerateUniqueSlug(ctx, collection)
+		if err != nil {
+			log.Printf("Failed to generate unique slug: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create room"})
+			return
+		}
 	}
 
 	room := models.Room{
