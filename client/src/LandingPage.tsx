@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { StartupAnimation } from "./components/StartupAnimation";
-import { ThemeToggle } from "./components/ThemeToggle";
+
 import "./LandingPage.css";
 
 export const LandingPage: React.FC = () => {
@@ -97,17 +97,6 @@ export const LandingPage: React.FC = () => {
       )}
 
       <div className="landing-page">
-        <div
-          style={{
-            position: "absolute",
-            top: "20px",
-            right: "20px",
-            zIndex: 50,
-          }}
-        >
-          <ThemeToggle />
-        </div>
-
         <div className="glass-card">
           <div className="card-header">
             <h1 className="logo-text">
