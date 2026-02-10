@@ -1,55 +1,25 @@
 {
   "themeName": "NoteX Visual System",
-  "version": "1.3.0",
-  "themes": {
-    "graphite": {
-      "displayName": "Graphite Liquid Glass",
-      "colors": {
-        "glass-bg": "rgba(20, 20, 22, 0.35)",
-        "glass-border": "rgba(255, 255, 255, 0.10)",
-        "glass-shadow": "0 8px 32px 0 rgba(0, 0, 0, 0.55)",
-
-        "accent-color": "#D1D1D6",
-
-        "text-main": "#F2F2F3",
-        "text-dim": "rgba(242, 242, 243, 0.65)",
-
-        "scrollbar-thumb": "rgba(255, 255, 255, 0.20)",
-        "button-hover": "rgba(255, 255, 255, 0.12)",
-
-        "bg-gradient": "linear-gradient(135deg, #0B0B0D 0%, #151518 50%, #1E1E22 100%)",
-
-        "ambient-orbs": [
-          "#2A2A2E",
-          "#3A3A40",
-          "#1C1C20"
-        ]
-      }
-    },
-
-    "paper": {
-      "displayName": "Paper Liquid Glass",
-      "colors": {
-        "glass-bg": "rgba(255, 255, 255, 0.55)",
-        "glass-border": "rgba(0, 0, 0, 0.10)",
-        "glass-shadow": "0 8px 32px 0 rgba(0, 0, 0, 0.10)",
-
-        "accent-color": "#3A3A3C",
-
-        "text-main": "#1C1C1E",
-        "text-dim": "rgba(28, 28, 30, 0.65)",
-
-        "scrollbar-thumb": "rgba(28, 28, 30, 0.20)",
-        "button-hover": "rgba(255, 255, 255, 0.45)",
-
-        "bg-gradient": "linear-gradient(135deg, #FAFAFA 0%, #F2F2F4 50%, #EAEAED 100%)",
-
-        "ambient-orbs": [
-          "#E5E5E8",
-          "#DADADD",
-          "#F0F0F2"
-        ]
-      }
+  "version": "2.0.0",
+  "description": "Dark mode only theme system for NoteX",
+  "theme": {
+    "displayName": "Graphite Liquid Glass",
+    "colors": {
+      "glass-bg": "rgba(20, 20, 22, 0.35)",
+      "glass-border": "rgba(255, 255, 255, 0.10)",
+      "glass-shadow": "0 8px 32px 0 rgba(0, 0, 0, 0.55)",
+      "accent-color": "#D1D1D6",
+      "text-main": "#F2F2F3",
+      "text-dim": "rgba(242, 242, 243, 0.65)",
+      "scrollbar-thumb": "rgba(255, 255, 255, 0.20)",
+      "button-hover": "rgba(255, 255, 255, 0.12)",
+      "bg-gradient": "#000000",
+      "orb-1": "#2A2A2E",
+      "orb-2": "#3A3A40",
+      "orb-3": "#1C1C20",
+      "glass-item-bg": "rgba(255, 255, 255, 0.03)",
+      "btn-bg-idle": "rgba(255, 255, 255, 0.05)",
+      "glass-border-dim": "rgba(255, 255, 255, 0.04)"
     }
   },
   "semanticColors": {
@@ -69,5 +39,12 @@
     "fontFamily": "'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif",
     "lineHeight": 1.55,
     "fontWeight": 400
+  },
+  "particles": {
+    "color": "#FFFFFF",
+    "count": 900,
+    "spread": 10,
+    "speed": 0.1,
+    "baseSize": 100
   }
 }
