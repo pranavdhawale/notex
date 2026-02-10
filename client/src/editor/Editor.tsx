@@ -18,10 +18,12 @@ import TextAlign from "@tiptap/extension-text-align";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import "./Editor.css";
+import Particles from "../components/Particles";
 import { FilesSidebar } from "./FilesSidebar";
 import { UsersSidebar } from "./UsersSidebar";
 import { Toolbar } from "./Toolbar";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { useTheme } from "../components/ThemeContext";
 import axios from "axios";
 import { Users, LogOut, Trash, Save, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -250,7 +252,10 @@ export const Editor: React.FC<EditorProps> = ({
     const saved = localStorage.getItem("notex_show_users");
     return saved === null ? true : saved === "true";
   });
+  const { theme } = useTheme();
   const navigate = useNavigate();
+
+  const particleColor = theme === "light" ? "#000000" : "#ffffff";
 
   const handleLeave = () => {
     navigate("/");
@@ -460,6 +465,19 @@ export const Editor: React.FC<EditorProps> = ({
 
   return (
     <div className="editor-layout">
+      <Particles
+        key={theme}
+        particleColors={[particleColor, particleColor]}
+        particleCount={900}
+        particleSpread={10}
+        speed={0.1}
+        particleBaseSize={100}
+        moveParticlesOnHover={false}
+        alphaParticles={false}
+        disableRotation={false}
+        pixelRatio={1}
+      />
+
       {/* LEFT SIDEBAR: FILES */}
       <FilesSidebar
         roomSlug={roomSlug}

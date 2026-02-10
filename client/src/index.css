@@ -1,3 +1,11 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 :root {
   font-family: "Inter", system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.55;
@@ -52,7 +60,7 @@
   --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
   --accent-color: #3a3a3c;
   --text-main: #1c1c1e;
-  --bg-gradient: linear-gradient(135deg, #fafafa 0%, #f2f2f4 50%, #eaeaed 100%);
+  --bg-gradient: #ffffff;
   --text-dim: rgba(28, 28, 30, 0.65);
   --scrollbar-thumb: rgba(28, 28, 30, 0.2);
   --button-hover: rgba(255, 255, 255, 0.45);
@@ -83,7 +91,7 @@
   --text-dim: rgba(242, 242, 243, 0.65);
   --scrollbar-thumb: rgba(255, 255, 255, 0.2);
   --button-hover: rgba(255, 255, 255, 0.12);
-  --bg-gradient: linear-gradient(135deg, #0b0b0d 0%, #151518 50%, #1e1e22 100%);
+  --bg-gradient: #000000;
   --orb-1: #2a2a2e;
   --orb-2: #3a3a40;
   --orb-3: #1c1c20;
@@ -109,7 +117,7 @@ body {
   min-height: 100vh;
   background: var(--bg-gradient);
   background: var(--bg-gradient);
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 h1 {
