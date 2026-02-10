@@ -1,10 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  useParams,
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
 import { Editor } from "./editor/Editor";
 import { LandingPage } from "./LandingPage";
 import axios from "axios";
@@ -13,7 +8,7 @@ import "./App.css";
 const EditorRoute = () => {
   const { roomSlug } = useParams<{ roomSlug: string }>();
   const [username, setUsername] = useState(
-    localStorage.getItem("notex_username") || ""
+    localStorage.getItem("notex_username") || "",
   );
   const [tempName, setTempName] = useState("");
   const [isOwner, setIsOwner] = useState(false);
@@ -23,7 +18,7 @@ const EditorRoute = () => {
     if (!localStorage.getItem("notex_user_id")) {
       localStorage.setItem(
         "notex_user_id",
-        "user_" + Math.random().toString(36).substr(2, 9)
+        "user_" + Math.random().toString(36).substr(2, 9),
       );
     }
   }, []);
@@ -35,7 +30,7 @@ const EditorRoute = () => {
         .get(
           `${
             import.meta.env.VITE_API_URL || "http://localhost:8080"
-          }/api/rooms/${roomSlug}`
+          }/api/rooms/${roomSlug}`,
         )
         .then((res) => {
           const currentUserId = localStorage.getItem("notex_user_id");
@@ -46,7 +41,7 @@ const EditorRoute = () => {
         .catch((err) => {
           console.error(
             "Failed to fetch room details for ownership check",
-            err
+            err,
           );
         });
     }
@@ -70,16 +65,18 @@ const EditorRoute = () => {
         }}
       >
         {/* Reuse glass-card styling from LandingPage */}
-        <div className="glass-card" style={{ width: '400px', padding: '40px' }}>
-          <h2 style={{ 
-            color: 'var(--text-main)', 
-            marginBottom: '20px', 
-            textAlign: 'center',
-            fontSize: '1.5rem' 
-          }}>
+        <div className="glass-card" style={{ width: "400px", padding: "40px" }}>
+          <h2
+            style={{
+              color: "var(--text-main)",
+              marginBottom: "20px",
+              textAlign: "center",
+              fontSize: "1.5rem",
+            }}
+          >
             Enter your name to join
           </h2>
-          
+
           <div className="input-group">
             <input
               type="text"
@@ -97,7 +94,10 @@ const EditorRoute = () => {
             />
           </div>
 
-          <div className="actions" style={{ justifyContent: 'center', marginTop: '20px' }}>
+          <div
+            className="actions"
+            style={{ justifyContent: "center", marginTop: "20px" }}
+          >
             <button
               onClick={() => {
                 if (tempName.trim()) {
@@ -107,7 +107,7 @@ const EditorRoute = () => {
               }}
               disabled={!tempName.trim()}
               className="btn-primary"
-              style={{ width: '100%' }}
+              style={{ width: "100%" }}
             >
               Join Room
             </button>
@@ -116,8 +116,6 @@ const EditorRoute = () => {
       </div>
     );
   }
-
-
 
   if (!roomSlug) return <div>Invalid Room</div>;
 
@@ -136,11 +134,34 @@ const EditorRoute = () => {
   );
 };
 
-import { ThemeProvider } from "./components/ThemeContext";
+import { ThemeProvider, useTheme } from "./components/ThemeContext";
+import Particles from "./components/Particles";
+
+const GlobalParticles = () => {
+  const { theme } = useTheme();
+  const particleColor = theme === "light" ? "#000000" : "#ffffff";
+
+  return (
+    <Particles
+      key={theme}
+      particleColors={[particleColor, particleColor]}
+      particleCount={900}
+      particleSpread={10}
+      speed={0.1}
+      particleBaseSize={100}
+      moveParticlesOnHover={false}
+      alphaParticles={false}
+      disableRotation={false}
+      pixelRatio={1}
+      className="global-particles"
+    />
+  );
+};
 
 function App() {
   return (
     <ThemeProvider>
+      <GlobalParticles />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
