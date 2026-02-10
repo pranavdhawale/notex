@@ -14,6 +14,7 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 - **Human-Friendly URLs 🎯**: Share memorable room links like `notex.pranavdhawale.in/my-project` or `notex.pranavdhawale.in/cosmic-whale`.
 - **Real-Time Magic ✨**: See cursors fly and text appear instantly with CRDT-backed concurrency.
 - **Ephemeral & Private 🔐**: Rooms auto-expire (24h empty, 7d with content) but you can save snapshots when needed.
+- **Mobile-First �**: Designed for seamless use on phones with a dedicated mobile UI and files modal.
 - **Engineering Excellence 🛠️**: A simple UI powers a robust, high-performance engine utilizing Go and modern web technologies.
 
 ## ✨ Features
@@ -49,11 +50,12 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 - **Download Files**: Access uploaded files anytime
 - **File Management**: View all files in a room
 
-### 💾 Smart Caching
+### ⚡ Performance & Caching
 
 - **Session Persistence**: Content cached in browser for resilience
 - **Auto-Recovery**: Recover work after page refresh
 - **Compression**: Efficient storage using pako compression
+- **Optimized Particles**: High-performance background effects powered by OGL, optimized for low resource usage.
 
 ## 🛠️ The Tech Stack
 
@@ -65,8 +67,7 @@ Notex isn't just a toy; it's an architectural showcase.
 - **TypeScript**: Type-safe development
 - **Tiptap**: Headless wrapper for ProseMirror, full editor control
 - **Yjs**: CRDT library for conflict-free real-time collaboration
-- **y-websocket**: WebSocket provider for Yjs
-- **Axios**: HTTP client for API calls
+- **OGL**: Ultra-lightweight WebGL library for the particle system
 - **Lucide React**: Beautiful icon library
 
 ### **Backend** (The Beast) 🦍
