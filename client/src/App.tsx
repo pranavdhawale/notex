@@ -134,16 +134,14 @@ const EditorRoute = () => {
   );
 };
 
-import { ThemeProvider, useTheme } from "./components/ThemeContext";
+import { ThemeProvider } from "./components/ThemeContext";
 import Particles from "./components/Particles";
 
 const GlobalParticles = () => {
-  const { theme } = useTheme();
-  const particleColor = theme === "light" ? "#000000" : "#ffffff";
+  const particleColor = "#ffffff"; // White particles for dark mode
 
   return (
     <Particles
-      key={theme}
       particleColors={[particleColor, particleColor]}
       particleCount={900}
       particleSpread={10}
