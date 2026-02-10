@@ -10,47 +10,7 @@
   /* Background handled by body in index.css */
 }
 
-/* Ambient Background Orbs */
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  z-index: 0;
-  opacity: 0.6;
-  animation: floatOrb 20s infinite alternate cubic-bezier(0.4, 0.0, 0.2, 1);
-}
-
-.orb-1 {
-  width: 400px;
-  height: 400px;
-  background: var(--orb-1);
-  top: -100px;
-  left: -100px;
-}
-
-.orb-2 {
-  width: 500px;
-  height: 500px;
-  background: var(--orb-2);
-  bottom: -150px;
-  right: -100px;
-  animation-delay: -5s;
-}
-
-.orb-3 {
-  width: 300px;
-  height: 300px;
-  background: var(--orb-3);
-  top: 40%;
-  left: 60%;
-  opacity: 0.4;
-  animation-duration: 25s;
-}
-
-@keyframes floatOrb {
-  0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(50px, 70px) scale(1.1); }
-}
+/* Ambient Background Orbs - Removed in favor of Particles */
 
 /* Glass Card Container */
 .glass-card {
@@ -72,8 +32,14 @@
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(40px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Branding */
@@ -162,7 +128,8 @@
   transform: scale(0.98);
 }
 
-.btn-create:disabled, .btn-primary:disabled {
+.btn-create:disabled,
+.btn-primary:disabled {
   background: #444;
   opacity: 0.7;
   cursor: not-allowed;
@@ -183,11 +150,12 @@
   letter-spacing: 1px;
 }
 
-.divider::before, .divider::after {
+.divider::before,
+.divider::after {
   content: "";
   flex: 1;
   height: 1px;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .divider span {
@@ -231,4 +199,3 @@
   font-size: 0.8rem;
   color: var(--text-dim);
 }
-

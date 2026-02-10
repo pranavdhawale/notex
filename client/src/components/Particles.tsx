@@ -111,7 +111,7 @@ const Particles: React.FC<ParticlesProps> = ({
   sizeRandomness = 1,
   cameraDistance = 20,
   disableRotation = false,
-  pixelRatio = 1,
+  pixelRatio = Math.min(window.devicePixelRatio, 2),
   className,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -120,6 +120,23 @@ const Particles: React.FC<ParticlesProps> = ({
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    // Seeded Random Logic
+    function mulberry32(a: number) {
+      return function () {
+        var t = (a += 0x6d2b79f5);
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    let seedVal = parseInt(sessionStorage.getItem("notex_particle_seed") || "");
+    if (isNaN(seedVal)) {
+      seedVal = Date.now();
+      sessionStorage.setItem("notex_particle_seed", seedVal.toString());
+    }
+    const random = mulberry32(seedVal);
 
     const renderer = new Renderer({
       dpr: pixelRatio,
@@ -139,7 +156,14 @@ const Particles: React.FC<ParticlesProps> = ({
       renderer.setSize(width, height);
       camera.perspective({ aspect: gl.canvas.width / gl.canvas.height });
     };
-    window.addEventListener("resize", resize, false);
+
+    // Debounce resize
+    let resizeTimeout: ReturnType<typeof setTimeout>;
+    const onResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(resize, 200);
+    };
+    window.addEventListener("resize", onResize, false);
     resize();
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -166,18 +190,15 @@ const Particles: React.FC<ParticlesProps> = ({
     for (let i = 0; i < count; i++) {
       let x: number, y: number, z: number, len: number;
       do {
-        x = Math.random() * 2 - 1;
-        y = Math.random() * 2 - 1;
-        z = Math.random() * 2 - 1;
+        x = random() * 2 - 1;
+        y = random() * 2 - 1;
+        z = random() * 2 - 1;
         len = x * x + y * y + z * z;
       } while (len > 1 || len === 0);
-      const r = Math.cbrt(Math.random());
+      const r = Math.cbrt(random());
       positions.set([x * r, y * r, z * r], i * 3);
-      randoms.set(
-        [Math.random(), Math.random(), Math.random(), Math.random()],
-        i * 4,
-      );
-      const col = hexToRgb(palette[Math.floor(Math.random() * palette.length)]);
+      randoms.set([random(), random(), random(), random()], i * 4);
+      const col = hexToRgb(palette[Math.floor(random() * palette.length)]);
       colors.set(col, i * 3);
     }
 
@@ -206,8 +227,11 @@ const Particles: React.FC<ParticlesProps> = ({
     let animationFrameId: number;
     let lastTime = performance.now();
     let elapsed = 0;
+    let isVisible = true;
 
     const update = (t: number) => {
+      if (!isVisible) return;
+
       animationFrameId = requestAnimationFrame(update);
       const delta = t - lastTime;
       lastTime = t;
@@ -232,10 +256,23 @@ const Particles: React.FC<ParticlesProps> = ({
       renderer.render({ scene: particles, camera });
     };
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        isVisible = false;
+        cancelAnimationFrame(animationFrameId);
+      } else {
+        isVisible = true;
+        lastTime = performance.now();
+        update(performance.now());
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     animationFrameId = requestAnimationFrame(update);
 
     return () => {
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", onResize);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (moveParticlesOnHover) {
         window.removeEventListener("mousemove", handleMouseMove);
       }

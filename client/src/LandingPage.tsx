@@ -97,11 +97,6 @@ export const LandingPage: React.FC = () => {
       )}
 
       <div className="landing-page">
-        {/* Background Ambient Orbs */}
-        <div className="orb orb-1"></div>
-        <div className="orb orb-2"></div>
-        <div className="orb orb-3"></div>
-
         <div
           style={{
             position: "absolute",
