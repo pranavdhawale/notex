@@ -629,24 +629,24 @@
   .editor-toolbar-simple {
     display: none !important;
   }
-
-  /* Show files button on mobile */
-  .btn-icon.btn-files-mobile {
-    display: flex !important;
-  }
-
-  /* Hide users button on mobile */
-  .btn-icon.btn-users {
-    display: none !important;
-  }
 }
 
-/* Hide files button on desktop (default) */
+/* Desktop defaults (applied first) */
 .btn-icon.btn-files-mobile {
   display: none !important;
 }
 
-/* Show users button on desktop (default) */
 .btn-icon.btn-users {
   display: flex !important;
+}
+
+/* Mobile overrides (applied last, wins due to media query specificity) */
+@media (max-width: 767px) {
+  .btn-icon.btn-files-mobile {
+    display: flex !important;
+  }
+
+  .btn-icon.btn-users {
+    display: none !important;
+  }
 }
