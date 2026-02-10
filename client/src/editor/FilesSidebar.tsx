@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import * as Y from "yjs";
-import { 
-  File, 
-  Trash2, 
-  Upload, 
-  FileText, 
-  Image as ImageIcon, 
-  Film, 
-  Music, 
-  Code 
+import {
+  File,
+  Trash2,
+  Upload,
+  FileText,
+  Image as ImageIcon,
+  Film,
+  Music,
+  Code,
 } from "lucide-react";
-
 
 interface FilesSidebarProps {
   roomSlug: string;
@@ -56,7 +55,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       const res = await axios.get(
         `${
           import.meta.env.VITE_API_URL || "http://localhost:8080"
-        }/api/rooms/${roomSlug}/files`
+        }/api/rooms/${roomSlug}/files`,
       );
       setFiles(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
@@ -74,7 +73,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
         }/api/rooms/${roomSlug}/files/${fileId}`,
         {
           headers: { "X-User-ID": userId },
-        }
+        },
       );
 
       const yMeta = ydoc.getMap("meta");
@@ -121,14 +120,32 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
   };
 
   const getFileIcon = (filename: string) => {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    switch(ext) {
-      case 'png': case 'jpg': case 'jpeg': case 'gif': case 'svg': return <ImageIcon size={18} />;
-      case 'mp4': case 'mov': case 'avi': return <Film size={18} />;
-      case 'mp3': case 'wav': return <Music size={18} />;
-      case 'js': case 'ts': case 'tsx': case 'py': case 'json': return <Code size={18} />;
-      case 'txt': case 'md': return <FileText size={18} />;
-      default: return <File size={18} />;
+    const ext = filename.split(".").pop()?.toLowerCase();
+    switch (ext) {
+      case "png":
+      case "jpg":
+      case "jpeg":
+      case "gif":
+      case "svg":
+        return <ImageIcon size={18} />;
+      case "mp4":
+      case "mov":
+      case "avi":
+        return <Film size={18} />;
+      case "mp3":
+      case "wav":
+        return <Music size={18} />;
+      case "js":
+      case "ts":
+      case "tsx":
+      case "py":
+      case "json":
+        return <Code size={18} />;
+      case "txt":
+      case "md":
+        return <FileText size={18} />;
+      default:
+        return <File size={18} />;
     }
   };
 
@@ -151,10 +168,10 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
           <div className="liquid-glass-distortion left"></div>
           <div className="liquid-glass-distortion right"></div>
         </div>
-        
+
         <div className="header-content">
-            <h3>Files</h3>
-            <span className="badge">{files.length}</span>
+          <h3>Files</h3>
+          <span className="badge">{files.length}</span>
         </div>
       </div>
 
@@ -182,7 +199,9 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
                   >
                     {f.name}
                   </a>
-                  <span className="file-meta">{(f.size / 1024 / 1024).toFixed(2)} MB</span>
+                  <span className="file-meta">
+                    {(f.size / 1024 / 1024).toFixed(2)} MB
+                  </span>
                 </div>
                 {canDelete && (
                   <button
@@ -197,7 +216,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
           })
         )}
       </div>
-      
+
       {uploading && (
         <div className="upload-indicator">
           <span>Uploading...</span>
