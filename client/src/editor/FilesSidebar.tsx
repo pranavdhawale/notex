@@ -170,8 +170,34 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
         </div>
 
         <div className="header-content">
-          <h3>Files</h3>
-          <span className="badge">{files.length}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <h3>Files</h3>
+            <span className="badge">{files.length}</span>
+          </div>
+          <input
+            type="file"
+            id="file-upload-input"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                handleDrop({
+                  preventDefault: () => {},
+                  dataTransfer: { files: [file] },
+                } as any);
+                e.target.value = "";
+              }
+            }}
+          />
+          <button
+            className="btn-icon"
+            onClick={() =>
+              document.getElementById("file-upload-input")?.click()
+            }
+            title="Upload File"
+          >
+            <Upload size={18} />
+          </button>
         </div>
       </div>
 

@@ -123,10 +123,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  align-content: center; /* Safety */
   /* Fixed height match sidebar */
   height: 60px;
   padding: 0 20px;
   box-sizing: border-box;
+  line-height: 1; /* prevent font leading issues */
 }
 
 .status-bar-row .btn-icon {
@@ -349,7 +351,8 @@
   z-index: 10;
   display: flex;
   justify-content: center;
-  padding: 0 10px 15px 10px;
+  align-items: center; /* Vertical Center */
+  padding: 10px; /* Balanced Padding */
   gap: 12px;
   flex-wrap: wrap;
   background: transparent;
@@ -480,4 +483,170 @@
 .btn-icon.delete:hover {
   color: var(--color-error);
   background: rgba(255, 59, 48, 0.1);
+}
+/* ========================================
+   RESPONSIVE BREAKPOINTS (Mobile First)
+   ======================================== */
+
+/* Mobile devices (default, 320px+) */
+/* Sidebars hidden by default on mobile, editor takes full width */
+
+/* Small devices (large phones, 640px and up) */
+@media (min-width: 640px) {
+  .editor-layout {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .ProseMirror {
+    padding: 20px 25px;
+    font-size: 1rem;
+  }
+
+  .toolbar-btn-circle {
+    width: 32px;
+    height: 32px;
+  }
+
+  .btn-icon {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* Medium devices (tablets, 768px and up) */
+@media (min-width: 768px) {
+  .editor-layout {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .left-panel {
+    width: 220px;
+    min-width: 220px;
+  }
+
+  .right-panel {
+    width: 200px;
+    min-width: 200px;
+  }
+
+  .ProseMirror {
+    padding: 25px 30px;
+    font-size: 1.02rem;
+  }
+
+  .toolbar-btn-circle {
+    width: 34px;
+    height: 34px;
+  }
+}
+
+/* Large devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .editor-layout {
+    padding: 15px;
+    gap: 15px;
+  }
+
+  .left-panel {
+    width: 260px;
+    min-width: 260px;
+  }
+
+  .right-panel {
+    width: 240px;
+    min-width: 240px;
+  }
+
+  .ProseMirror {
+    padding: 30px 40px;
+    font-size: 1.05rem;
+  }
+
+  .toolbar-btn-circle {
+    width: 36px;
+    height: 36px;
+  }
+
+  .btn-icon {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* Extra large devices (large desktops, 1280px and up) */
+@media (min-width: 1280px) {
+  .ProseMirror {
+    max-width: 1200px;
+  }
+}
+
+/* 2XL devices (very large screens, 1536px and up) */
+@media (min-width: 1536px) {
+  .ProseMirror {
+    max-width: 1400px;
+    padding: 40px 50px;
+  }
+}
+
+/* Mobile-specific: Hide sidebars by default */
+@media (max-width: 767px) {
+  .left-panel,
+  .right-panel {
+    display: none;
+  }
+
+  .editor-layout {
+    padding: 5px;
+    gap: 0;
+  }
+
+  .editor-main {
+    border-radius: 12px;
+  }
+
+  .ProseMirror {
+    padding: 20px;
+    font-size: 0.95rem;
+  }
+
+  /* Consolidated status bar styles */
+  .status-bar-row {
+    padding: 0 12px;
+    height: 56px;
+    gap: 8px;
+    display: flex;
+    align-items: center;
+  }
+
+  .status-bar-row .btn-icon {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  /* Hide formatting toolbar on mobile - keep only essential buttons */
+  .editor-toolbar-simple {
+    display: none !important;
+  }
+}
+
+/* Desktop defaults (applied first) */
+.btn-icon.btn-files-mobile {
+  display: none !important;
+}
+
+.btn-icon.btn-users {
+  display: flex !important;
+}
+
+/* Mobile overrides (applied last, wins due to media query specificity) */
+@media (max-width: 767px) {
+  .btn-icon.btn-files-mobile {
+    display: flex !important;
+  }
+
+  .btn-icon.btn-users {
+    display: none !important;
+  }
 }

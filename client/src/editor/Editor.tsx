@@ -20,9 +20,10 @@ import { WebsocketProvider } from "y-websocket";
 import "./Editor.css";
 import { FilesSidebar } from "./FilesSidebar";
 import { UsersSidebar } from "./UsersSidebar";
+import { FilesModal } from "./FilesModal";
 import { Toolbar } from "./Toolbar";
 import axios from "axios";
-import { Users, LogOut, Trash, Save, Loader2 } from "lucide-react";
+import { Users, LogOut, Trash, Save, Loader2, File } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cacheManager } from "../utils/SmartCacheManager";
 import { NotFoundView } from "../components/NotFoundView";
@@ -54,6 +55,7 @@ const TiptapEditor: React.FC<{
   saving: boolean;
   showUsers: boolean;
   setShowUsers: (show: boolean) => void;
+  setShowFilesModal: (show: boolean) => void;
   handleLeave: () => void;
   handleDeleteRoom: () => void;
   handleSave: () => void;
@@ -67,6 +69,7 @@ const TiptapEditor: React.FC<{
   saving,
   showUsers,
   setShowUsers,
+  setShowFilesModal,
   handleLeave,
   handleDeleteRoom,
   handleSave,
@@ -214,8 +217,15 @@ const TiptapEditor: React.FC<{
                 }}
               ></div>
               <button
+                onClick={() => setShowFilesModal(true)}
+                className="btn-icon btn-files-mobile"
+                title="Files"
+              >
+                <File size={20} />
+              </button>
+              <button
                 onClick={() => setShowUsers(!showUsers)}
-                className="btn-icon"
+                className="btn-icon btn-users"
                 title="Toggle Users"
               >
                 <Users size={20} />
@@ -248,6 +258,9 @@ export const Editor: React.FC<EditorProps> = ({
     const saved = localStorage.getItem("notex_show_users");
     return saved === null ? true : saved === "true";
   });
+  const [showFilesModal, setShowFilesModal] = useState(false);
+  const [files, setFiles] = useState<any[]>([]);
+  const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
 
   const handleLeave = () => {
@@ -278,6 +291,59 @@ export const Editor: React.FC<EditorProps> = ({
     }
   };
 
+  const handleFileUpload = async (file: File) => {
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const apiUrl = `${
+        import.meta.env.VITE_API_URL || "http://localhost:8080"
+      }/api/upload/${roomSlug}`;
+      const res = await axios.post(apiUrl, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "X-User-ID": userId,
+        },
+      });
+
+      const newFile = res.data;
+      if (ydoc) {
+        const yMeta = ydoc.getMap("meta");
+        yMeta.set("lastUpload", Date.now());
+      }
+
+      setFiles((prev) => [...prev, newFile]);
+    } catch (err) {
+      alert("Upload failed. Max 100MB.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileDelete = async (fileId: string) => {
+    if (!confirm("Delete this file?")) return;
+    try {
+      await axios.delete(
+        `${
+          import.meta.env.VITE_API_URL || "http://localhost:8080"
+        }/api/rooms/${roomSlug}/files/${fileId}`,
+        {
+          headers: { "X-User-ID": userId },
+        },
+      );
+
+      if (ydoc) {
+        const yMeta = ydoc.getMap("meta");
+        yMeta.set("lastUpload", Date.now());
+      }
+
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
+    } catch (e) {
+      alert("Failed to delete file");
+    }
+  };
+
   // Stable user details with persisted color
   const [userDetails] = useState(() => {
     let color = localStorage.getItem("notex_user_color");
@@ -295,6 +361,36 @@ export const Editor: React.FC<EditorProps> = ({
   useEffect(() => {
     localStorage.setItem("notex_show_users", String(showUsers));
   }, [showUsers]);
+
+  // Fetch files for mobile modal
+  useEffect(() => {
+    const fetchFiles = async () => {
+      if (!ydoc) return;
+      try {
+        const res = await axios.get(
+          `${
+            import.meta.env.VITE_API_URL || "http://localhost:8080"
+          }/api/rooms/${roomSlug}/files`,
+        );
+        setFiles(Array.isArray(res.data) ? res.data : []);
+      } catch (e) {
+        console.error(e);
+        setFiles([]);
+      }
+    };
+
+    if (ydoc) {
+      fetchFiles();
+
+      // Refetch when metadata changes
+      const yMeta = ydoc.getMap("meta");
+      const observer = () => {
+        fetchFiles();
+      };
+      yMeta.observe(observer);
+      return () => yMeta.unobserve(observer);
+    }
+  }, [roomSlug, ydoc]);
 
   // Initial Load from SmartCache OR Server
   useEffect(() => {
@@ -477,6 +573,7 @@ export const Editor: React.FC<EditorProps> = ({
           saving={saving}
           showUsers={showUsers}
           setShowUsers={setShowUsers}
+          setShowFilesModal={setShowFilesModal}
           handleLeave={handleLeave}
           handleDeleteRoom={handleDeleteRoom}
           handleSave={() => handleSave(false)}
@@ -484,11 +581,23 @@ export const Editor: React.FC<EditorProps> = ({
         />
       </div>
 
-      {/* RIGHT SIDEBAR: USERS */}
+      {/* RIGHT: USERS */}
       <UsersSidebar
         provider={provider}
         isOpen={showUsers}
         onClose={() => setShowUsers(false)}
+      />
+
+      {/* Mobile Files Modal */}
+      <FilesModal
+        isOpen={showFilesModal}
+        onClose={() => setShowFilesModal(false)}
+        files={files}
+        onUpload={handleFileUpload}
+        onDelete={handleFileDelete}
+        uploading={uploading}
+        userId={userId}
+        isRoomOwner={isOwner}
       />
     </div>
   );

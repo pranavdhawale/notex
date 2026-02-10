@@ -143,10 +143,10 @@ const GlobalParticles = () => {
   return (
     <Particles
       particleColors={[particleColor, particleColor]}
-      particleCount={900}
+      particleCount={300}
       particleSpread={10}
-      speed={0.1}
-      particleBaseSize={100}
+      speed={0.05}
+      particleBaseSize={120}
       moveParticlesOnHover={false}
       alphaParticles={false}
       disableRotation={false}

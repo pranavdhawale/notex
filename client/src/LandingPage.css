@@ -24,10 +24,10 @@
   border: 1px solid var(--glass-border);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
   border-radius: 24px;
-  padding: 40px;
+  padding: 24px; /* Mobile first: smaller padding */
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: 20px; /* Mobile first: smaller gap */
   animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -48,26 +48,29 @@
 }
 
 .logo-text {
-  font-size: 3.5rem;
+  font-size: 2.5rem; /* Mobile first: smaller logo */
   margin: 0;
   font-weight: 800;
-  letter-spacing: -2px;
-  background: linear-gradient(to right, var(--text-main), #6e2c56);
+  letter-spacing: -1.5px;
+  background: linear-gradient(to right, var(--text-main), #7c3aed);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .logo-text span {
-  color: var(--accent-color);
-  background: none;
-  -webkit-text-fill-color: var(--accent-color);
+  color: #8b5cf6;
+  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .tagline {
   margin-top: 5px;
   color: var(--text-dim);
   font-weight: 300;
+  font-size: 0.9rem; /* Mobile first: smaller tagline */
 }
 
 /* Inputs */
@@ -86,8 +89,8 @@
 
 .glass-input {
   width: 100%;
-  padding: 16px;
-  font-size: 1.1rem;
+  padding: 14px; /* Mobile first: slightly smaller padding */
+  font-size: 1rem; /* Mobile first: smaller font */
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
@@ -115,9 +118,10 @@
   color: white; /* Always white on primary btn */
   font-weight: 700;
   border: none;
-  padding: 16px;
-  font-size: 1.1rem;
+  padding: 14px; /* Mobile first: slightly smaller padding */
+  font-size: 1rem; /* Mobile first: smaller font */
   letter-spacing: 0.5px;
+  min-height: 44px; /* Touch-friendly minimum */
 }
 
 .btn-primary:hover {
@@ -138,14 +142,14 @@
 .actions {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px; /* Mobile first: smaller gap */
 }
 
 .divider {
   display: flex;
   align-items: center;
   color: var(--text-dim);
-  font-size: 0.8rem;
+  font-size: 0.75rem; /* Mobile first: smaller divider text */
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -164,8 +168,8 @@
 
 /* Join Section */
 .join-row {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
+  display: flex; /* Mobile first: stack vertically */
+  flex-direction: column;
   gap: 10px;
 }
 
@@ -175,12 +179,14 @@
   text-align: center;
   text-transform: uppercase;
   letter-spacing: 1px;
+  min-height: 44px; /* Touch-friendly */
 }
 
 .btn-secondary {
   background: var(--glass-border);
   border: 1px solid var(--glass-border);
   color: var(--text-main);
+  min-height: 44px; /* Touch-friendly */
 }
 
 .btn-secondary:hover {
@@ -196,6 +202,95 @@
 .glass-footer {
   position: absolute;
   bottom: 20px;
-  font-size: 0.8rem;
+  font-size: 0.75rem; /* Mobile first: smaller footer */
   color: var(--text-dim);
+}
+
+/* ========================================
+   RESPONSIVE BREAKPOINTS (Mobile First)
+   ======================================== */
+
+/* Small devices (large phones, 640px and up) */
+@media (min-width: 640px) {
+  .glass-card {
+    padding: 30px;
+    gap: 24px;
+  }
+
+  .logo-text {
+    font-size: 3rem;
+    letter-spacing: -1.8px;
+  }
+
+  .tagline {
+    font-size: 1rem;
+  }
+
+  .glass-input {
+    padding: 15px;
+    font-size: 1.05rem;
+  }
+
+  .btn-primary {
+    padding: 15px;
+    font-size: 1.05rem;
+  }
+
+  .actions {
+    gap: 18px;
+  }
+
+  .divider {
+    font-size: 0.8rem;
+  }
+
+  .join-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    flex-direction: row;
+  }
+
+  .glass-footer {
+    font-size: 0.8rem;
+  }
+}
+
+/* Medium devices (tablets, 768px and up) */
+@media (min-width: 768px) {
+  .glass-card {
+    padding: 35px;
+    gap: 28px;
+  }
+
+  .logo-text {
+    font-size: 3.3rem;
+    letter-spacing: -2px;
+  }
+
+  .glass-input {
+    padding: 16px;
+    font-size: 1.1rem;
+  }
+
+  .btn-primary {
+    padding: 16px;
+    font-size: 1.1rem;
+  }
+
+  .actions {
+    gap: 20px;
+  }
+}
+
+/* Large devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .glass-card {
+    padding: 40px;
+    gap: 30px;
+  }
+
+  .logo-text {
+    font-size: 3.5rem;
+    letter-spacing: -2px;
+  }
 }
