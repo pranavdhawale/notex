@@ -108,13 +108,6 @@ button:focus-visible {
 ::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.1);
 }
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
 
 /* Utility Animations */
 @keyframes spin {
@@ -125,4 +118,60 @@ button:focus-visible {
 
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+/* ========================================
+   RESPONSIVE UTILITIES
+   ======================================== */
+
+/* Fluid Typography */
+html {
+  font-size: 16px; /* Base font size */
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 14px; /* Smaller base on mobile */
+  }
+}
+
+@media (min-width: 1280px) {
+  html {
+    font-size: 17px; /* Slightly larger on desktop */
+  }
+}
+
+@media (min-width: 1536px) {
+  html {
+    font-size: 18px; /* Larger on very large screens */
+  }
+}
+
+/* Touch-Friendly Interactive Elements */
+@media (max-width: 767px) {
+  button,
+  .btn-icon,
+  .toolbar-btn-circle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Responsive Spacing */
+@media (max-width: 640px) {
+  body {
+    padding: 0;
+  }
+}
+
+/* Prevent horizontal scroll on mobile */
+body {
+  overflow-x: hidden;
+}
+
+/* Responsive scrollbar */
+@media (max-width: 767px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
 }
