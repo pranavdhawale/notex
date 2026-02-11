@@ -33,6 +33,7 @@ interface ActiveUpload {
   id: string;
   name: string;
   progress: number;
+  speed: string;
   controller: AbortController;
 }
 
@@ -123,6 +124,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       id: uploadId,
       name: file.name,
       progress: 0,
+      speed: "0 KB/s",
       controller,
     };
 
@@ -130,6 +132,9 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
 
     const formData = new FormData();
     formData.append("file", file);
+
+    let lastLoaded = 0;
+    let lastTime = Date.now();
 
     try {
       const apiUrl = `${
@@ -147,9 +152,34 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
           const current = progressEvent.loaded;
           const percentCompleted = Math.round((current * 100) / total);
 
+          const now = Date.now();
+          const timeDiff = (now - lastTime) / 1000; // seconds
+
+          let speedStr = "Calculating...";
+          if (timeDiff >= 0.5) {
+            // Update speed every 500ms
+            const loadedDiff = current - lastLoaded;
+            const speed = loadedDiff / timeDiff; // bytes per second
+
+            if (speed > 1024 * 1024) {
+              speedStr = `${(speed / (1024 * 1024)).toFixed(1)} MB/s`;
+            } else {
+              speedStr = `${(speed / 1024).toFixed(1)} KB/s`;
+            }
+
+            lastLoaded = current;
+            lastTime = now;
+          }
+
           setActiveUploads((prev) =>
             prev.map((u) =>
-              u.id === uploadId ? { ...u, progress: percentCompleted } : u,
+              u.id === uploadId
+                ? {
+                    ...u,
+                    progress: percentCompleted,
+                    ...(timeDiff >= 0.5 ? { speed: speedStr } : {}),
+                  }
+                : u,
             ),
           );
         },
@@ -164,7 +194,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       if (axios.isCancel(err)) {
         console.log("Upload cancelled");
       } else {
-        alert(`Upload failed for ${file.name}. Max 500MB.`);
+        alert(`Upload failed for ${file.name}. Max 200MB.`);
       }
     } finally {
       setActiveUploads((prev) => prev.filter((u) => u.id !== uploadId));
@@ -274,18 +304,28 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
                     marginBottom: "4px",
                   }}
                 >
-                  <span
+                  <div
                     style={{
-                      fontSize: "12px",
-                      fontWeight: 500,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      display: "flex",
+                      flexDirection: "column",
                       maxWidth: "80%",
                     }}
                   >
-                    {upload.name}
-                  </span>
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 500,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {upload.name}
+                    </span>
+                    <span style={{ fontSize: "10px", opacity: 0.7 }}>
+                      {upload.speed}
+                    </span>
+                  </div>
                   <button
                     onClick={() => cancelUpload(upload.id)}
                     className="btn-icon delete"
