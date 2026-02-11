@@ -323,7 +323,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
                       {upload.name}
                     </span>
                     <span style={{ fontSize: "10px", opacity: 0.7 }}>
-                      {upload.speed}
+                      {upload.speed} • {upload.progress}%
                     </span>
                   </div>
                   <button
