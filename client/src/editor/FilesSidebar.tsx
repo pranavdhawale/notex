@@ -10,6 +10,7 @@ import {
   Film,
   Music,
   Code,
+  X,
 } from "lucide-react";
 
 interface FilesSidebarProps {
@@ -28,6 +29,13 @@ interface FileData {
   uploaderId?: string;
 }
 
+interface ActiveUpload {
+  id: string;
+  name: string;
+  progress: number;
+  controller: AbortController;
+}
+
 export const FilesSidebar: React.FC<FilesSidebarProps> = ({
   roomSlug,
   ydoc,
@@ -36,7 +44,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
 }) => {
   const [files, setFiles] = useState<FileData[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [activeUploads, setActiveUploads] = useState<ActiveUpload[]>([]);
 
   useEffect(() => {
     fetchFiles();
@@ -85,6 +93,16 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
     }
   };
 
+  const cancelUpload = (uploadId: string) => {
+    setActiveUploads((prev) => {
+      const upload = prev.find((u) => u.id === uploadId);
+      if (upload) {
+        upload.controller.abort();
+      }
+      return prev.filter((u) => u.id !== uploadId);
+    });
+  };
+
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -92,18 +110,48 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
     const droppedFiles = Array.from(e.dataTransfer.files);
     if (droppedFiles.length === 0) return;
 
-    setUploading(true);
+    droppedFiles.forEach((file) => {
+      uploadFile(file);
+    });
+  };
+
+  const uploadFile = async (file: File) => {
+    const uploadId = Math.random().toString(36).substring(7);
+    const controller = new AbortController();
+
+    const newUpload: ActiveUpload = {
+      id: uploadId,
+      name: file.name,
+      progress: 0,
+      controller,
+    };
+
+    setActiveUploads((prev) => [...prev, newUpload]);
+
     const formData = new FormData();
-    formData.append("file", droppedFiles[0]);
+    formData.append("file", file);
 
     try {
       const apiUrl = `${
         import.meta.env.VITE_API_URL || "http://localhost:8080"
       }/api/upload/${roomSlug}`;
+
       const res = await axios.post(apiUrl, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
           "X-User-ID": userId,
+        },
+        signal: controller.signal,
+        onUploadProgress: (progressEvent) => {
+          const total = progressEvent.total || file.size;
+          const current = progressEvent.loaded;
+          const percentCompleted = Math.round((current * 100) / total);
+
+          setActiveUploads((prev) =>
+            prev.map((u) =>
+              u.id === uploadId ? { ...u, progress: percentCompleted } : u,
+            ),
+          );
         },
       });
 
@@ -112,10 +160,14 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       yMeta.set("lastUpload", Date.now());
 
       setFiles((prev) => [...(Array.isArray(prev) ? prev : []), newFile]);
-    } catch (err) {
-      alert("Upload failed. Max 100MB.");
+    } catch (err: any) {
+      if (axios.isCancel(err)) {
+        console.log("Upload cancelled");
+      } else {
+        alert(`Upload failed for ${file.name}. Max 500MB.`);
+      }
     } finally {
-      setUploading(false);
+      setActiveUploads((prev) => prev.filter((u) => u.id !== uploadId));
     }
   };
 
@@ -177,14 +229,12 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
           <input
             type="file"
             id="file-upload-input"
+            multiple
             style={{ display: "none" }}
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                handleDrop({
-                  preventDefault: () => {},
-                  dataTransfer: { files: [file] },
-                } as any);
+              const fileList = e.target.files;
+              if (fileList && fileList.length > 0) {
+                Array.from(fileList).forEach((file) => uploadFile(file));
                 e.target.value = "";
               }
             }}
@@ -202,7 +252,75 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       </div>
 
       <div className="files-list custom-scrollbar">
-        {files.length === 0 ? (
+        {activeUploads.length > 0 && (
+          <div className="active-uploads" style={{ marginBottom: "10px" }}>
+            {activeUploads.map((upload) => (
+              <div
+                key={upload.id}
+                className="upload-item-glass"
+                style={{
+                  padding: "8px",
+                  background: "rgba(255, 255, 255, 0.05)",
+                  borderRadius: "8px",
+                  marginBottom: "8px",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "4px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      maxWidth: "80%",
+                    }}
+                  >
+                    {upload.name}
+                  </span>
+                  <button
+                    onClick={() => cancelUpload(upload.id)}
+                    className="btn-icon delete"
+                    title="Cancel"
+                    style={{ padding: "2px", width: "20px", height: "20px" }}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+                <div
+                  className="progress-bar-container"
+                  style={{
+                    width: "100%",
+                    height: "4px",
+                    background: "rgba(255,255,255,0.1)",
+                    borderRadius: "2px",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    className="progress-bar-fill"
+                    style={{
+                      width: `${upload.progress}%`,
+                      height: "100%",
+                      background: "var(--accent-color, #3b82f6)",
+                      transition: "width 0.2s ease-out",
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {files.length === 0 && activeUploads.length === 0 ? (
           <div className="empty-state">
             <Upload size={32} opacity={0.5} />
             <p>Drop files here</p>
@@ -242,12 +360,6 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
           })
         )}
       </div>
-
-      {uploading && (
-        <div className="upload-indicator">
-          <span>Uploading...</span>
-        </div>
-      )}
     </div>
   );
 };
