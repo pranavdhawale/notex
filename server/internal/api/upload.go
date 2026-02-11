@@ -15,7 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-const MaxFileSize = 500 * 1024 * 1024 // 500MB
+const MaxFileSize = 200 * 1024 * 1024 // 200MB
 
 func UploadFile(c *gin.Context) {
 	roomID := c.Param("room")
@@ -31,7 +31,7 @@ func UploadFile(c *gin.Context) {
 	}
 
 	if file.Size > MaxFileSize {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "File exceeds 500MB limit"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File exceeds 200MB limit"})
 		return
 	}
 
