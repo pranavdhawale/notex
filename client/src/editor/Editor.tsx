@@ -597,6 +597,7 @@ export const Editor: React.FC<EditorProps> = ({
         onDelete={handleFileDelete}
         uploading={uploading}
         userId={userId}
+        roomSlug={roomSlug}
         isRoomOwner={isOwner}
       />
     </div>

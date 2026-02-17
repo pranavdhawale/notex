@@ -9,6 +9,7 @@ import {
   Film,
   Music,
   Code,
+  Download,
 } from "lucide-react";
 import "./FilesModal.css";
 
@@ -29,6 +30,7 @@ interface FilesModalProps {
   onDelete: (fileId: string) => Promise<void>;
   uploading: boolean;
   userId: string;
+  roomSlug: string;
   isRoomOwner: boolean;
 }
 
@@ -40,6 +42,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   onDelete,
   uploading,
   userId,
+  roomSlug,
   isRoomOwner,
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -111,7 +114,9 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                   <div className="file-icon">{getFileIcon(f.name)}</div>
                   <div className="file-info">
                     <a
-                      href={`${import.meta.env.VITE_API_URL || "http://localhost:8080"}${f.url}`}
+                      href={`${
+                        import.meta.env.VITE_API_URL || "http://localhost:8080"
+                      }/api/rooms/${roomSlug}/files/${f.id}/download`}
                       target="_blank"
                       rel="noopener noreferrer"
                       title={f.name}
@@ -122,14 +127,33 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                       {(f.size / 1024 / 1024).toFixed(2)} MB
                     </span>
                   </div>
-                  {canDelete && (
-                    <button
-                      onClick={() => onDelete(f.id)}
-                      className="btn-icon delete"
+                  <div
+                    className="file-actions"
+                    style={{
+                      display: "flex",
+                      gap: "8px",
+                      alignItems: "center",
+                    }}
+                  >
+                    <a
+                      href={`${
+                        import.meta.env.VITE_API_URL || "http://localhost:8080"
+                      }/api/rooms/${roomSlug}/files/${f.id}/download`}
+                      className="btn-icon"
+                      title="Download"
+                      download
                     >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
+                      <Download size={16} />
+                    </a>
+                    {canDelete && (
+                      <button
+                        onClick={() => onDelete(f.id)}
+                        className="btn-icon delete"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })
