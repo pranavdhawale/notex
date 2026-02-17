@@ -1,19 +1,19 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
   Upload,
-  Trash2,
   File,
   FileText,
-  Image as ImageIcon,
-  Film,
-  Music,
+  ImageIcon,
   Code,
+  Music,
+  Film,
   Download,
   Loader2,
-  Trash,
-  User,
+  FolderX,
+  FileMinus,
+  Trash2,
 } from "lucide-react";
 import { ConfirmationModal } from "../components/ConfirmationModal";
 import "./FilesModal.css";
@@ -61,6 +61,22 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const [showDeleteConfirmation, setShowDeleteConfirmation] =
     React.useState(false);
   const [deleteScope, setDeleteScope] = React.useState<"me" | "all">("me");
+
+  // Close modals on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (showDeleteConfirmation) setShowDeleteConfirmation(false);
+        else if (showDeleteSelection) setShowDeleteSelection(false);
+        else onClose(); // Close main modal if no sub-modals open
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [showDeleteSelection, showDeleteConfirmation, isOpen, onClose]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -136,7 +152,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                   title="Delete All Files"
                   style={{ color: "#ff4d4f" }}
                 >
-                  <Trash size={18} />
+                  <FolderX size={18} />
                 </button>
               )}
               <button className="btn-icon" onClick={onClose}>
@@ -317,7 +333,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                     }
                   >
                     <div className="card-icon">
-                      <User size={20} />
+                      <FileMinus size={20} />
                     </div>
                     <div className="card-content">
                       <span className="card-title">Delete My Files</span>
@@ -338,7 +354,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                     }}
                   >
                     <div className="card-icon">
-                      <Trash2 size={20} />
+                      <FolderX size={20} />
                     </div>
                     <div className="card-content">
                       <span className="card-title">Delete All Files</span>
