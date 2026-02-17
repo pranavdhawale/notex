@@ -172,3 +172,29 @@ func DeleteFile(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "File deleted"})
 }
+
+func DownloadFile(c *gin.Context) {
+	roomID := c.Param("room")
+	fileID := c.Param("fileId")
+
+	collection := state.MongoDatabase.Collection("files")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var file models.File
+	err := collection.FindOne(ctx, bson.M{"_id": fileID, "room_id": roomID}).Decode(&file)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+		return
+	}
+
+	// Check if file exists on disk
+	if _, err := os.Stat(file.Path); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "File content missing"})
+		return
+	}
+
+	// Force download with original filename
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", file.Name))
+	c.File(file.Path)
+}
