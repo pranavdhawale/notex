@@ -291,10 +291,18 @@ export const Editor: React.FC<EditorProps> = ({
     }
   };
 
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadSpeed, setUploadSpeed] = useState("");
+
   const handleFileUpload = async (file: File) => {
     setUploading(true);
+    setUploadProgress(0);
+    setUploadSpeed("0 KB/s");
     const formData = new FormData();
     formData.append("file", file);
+
+    let lastLoaded = 0;
+    let lastTime = Date.now();
 
     try {
       const apiUrl = `${
@@ -304,6 +312,27 @@ export const Editor: React.FC<EditorProps> = ({
         headers: {
           "Content-Type": "multipart/form-data",
           "X-User-ID": userId,
+        },
+        timeout: 10 * 60 * 1000,
+        onUploadProgress: (progressEvent) => {
+          const total = progressEvent.total || file.size;
+          const current = progressEvent.loaded;
+          const percentCompleted = Math.round((current * 100) / total);
+          setUploadProgress(percentCompleted);
+
+          const now = Date.now();
+          const timeDiff = (now - lastTime) / 1000;
+          if (timeDiff >= 0.5) {
+            const loadedDiff = current - lastLoaded;
+            const speed = loadedDiff / timeDiff;
+            if (speed > 1024 * 1024) {
+              setUploadSpeed(`${(speed / (1024 * 1024)).toFixed(1)} MB/s`);
+            } else {
+              setUploadSpeed(`${(speed / 1024).toFixed(1)} KB/s`);
+            }
+            lastLoaded = current;
+            lastTime = now;
+          }
         },
       });
 
@@ -315,9 +344,11 @@ export const Editor: React.FC<EditorProps> = ({
 
       setFiles((prev) => [...prev, newFile]);
     } catch (err) {
-      alert("Upload failed. Max 100MB.");
+      alert("Upload failed. Max 200MB.");
     } finally {
       setUploading(false);
+      setUploadProgress(0);
+      setUploadSpeed("");
     }
   };
 
@@ -596,6 +627,8 @@ export const Editor: React.FC<EditorProps> = ({
         onUpload={handleFileUpload}
         onDelete={handleFileDelete}
         uploading={uploading}
+        uploadProgress={uploadProgress}
+        uploadSpeed={uploadSpeed}
         userId={userId}
         roomSlug={roomSlug}
         isRoomOwner={isOwner}
