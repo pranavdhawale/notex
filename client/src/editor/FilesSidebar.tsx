@@ -147,6 +147,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
           "Content-Type": "multipart/form-data",
           "X-User-ID": userId,
         },
+        timeout: 10 * 60 * 1000, // 10 minutes timeout for large files
         signal: controller.signal,
         onUploadProgress: (progressEvent) => {
           const total = progressEvent.total || file.size;
