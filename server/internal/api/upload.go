@@ -198,3 +198,80 @@ func DownloadFile(c *gin.Context) {
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", file.Name))
 	c.File(file.Path)
 }
+
+func DeleteAllFiles(c *gin.Context) {
+	roomID := c.Param("room")
+	requestorID := c.GetHeader("X-User-ID")
+	targetUser := c.Query("user") // "me" or empty
+
+	if requestorID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing User ID header"})
+		return
+	}
+
+	collection := state.MongoDatabase.Collection("files")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// 1. Determine Filter
+	filter := bson.M{"room_id": roomID}
+
+	// 2. Check Permissions
+	roomCollection := state.MongoDatabase.Collection("rooms")
+	var room models.Room
+	err := roomCollection.FindOne(ctx, bson.M{"slug": roomID}).Decode(&room)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+		return
+	}
+
+	if targetUser == "me" {
+		// User deletes ONLY their own files
+		filter["uploader_id"] = requestorID
+	} else {
+		// Delete ALL files - Requires Room Ownership
+		if room.Owner != requestorID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Only room owner can delete all files"})
+			return
+		}
+	}
+
+	// 3. Find files to delete (to remove from disk)
+	cursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var files []models.File
+	if err = cursor.All(ctx, &files); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode files"})
+		return
+	}
+
+	if len(files) == 0 {
+		c.JSON(http.StatusOK, gin.H{"message": "No files to delete", "count": 0})
+		return
+	}
+
+	// 4. Delete from DB
+	_, err = collection.DeleteMany(ctx, filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete from database"})
+		return
+	}
+
+	// 5. Delete from Disk (Best effort)
+	deletedCount := 0
+	for _, f := range files {
+		if err := os.Remove(f.Path); err == nil {
+			deletedCount++
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Files deleted",
+		"count":   deletedCount,
+	})
+}
