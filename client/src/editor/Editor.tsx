@@ -375,6 +375,33 @@ export const Editor: React.FC<EditorProps> = ({
     }
   };
 
+  const handleDeleteAll = async (scope: "me" | "all") => {
+    try {
+      const url = `${
+        import.meta.env.VITE_API_URL || "http://localhost:8080"
+      }/api/rooms/${roomSlug}/files${scope === "me" ? "?user=me" : ""}`;
+
+      await axios.delete(url, {
+        headers: { "X-User-ID": userId },
+      });
+
+      if (ydoc) {
+        const yMeta = ydoc.getMap("meta");
+        yMeta.set("lastUpload", Date.now());
+      }
+
+      // Optimistic update
+      if (scope === "me") {
+        setFiles((prev) => prev.filter((f) => f.uploaderId !== userId));
+      } else {
+        setFiles([]);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete all files");
+    }
+  };
+
   // Stable user details with persisted color
   const [userDetails] = useState(() => {
     let color = localStorage.getItem("notex_user_color");
@@ -626,6 +653,7 @@ export const Editor: React.FC<EditorProps> = ({
         files={files}
         onUpload={handleFileUpload}
         onDelete={handleFileDelete}
+        onDeleteAll={handleDeleteAll}
         uploading={uploading}
         uploadProgress={uploadProgress}
         uploadSpeed={uploadSpeed}

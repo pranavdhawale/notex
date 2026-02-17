@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
 import * as Y from "yjs";
 import {
@@ -12,7 +13,10 @@ import {
   Code,
   X,
   Download,
+  Trash,
+  User,
 } from "lucide-react";
+import { ConfirmationModal } from "../components/ConfirmationModal";
 
 interface FilesSidebarProps {
   roomSlug: string;
@@ -92,6 +96,45 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       setFiles((prev) => prev.filter((f) => f.id !== fileId));
     } catch (e) {
       alert("Failed to delete file");
+    }
+  };
+
+  const [showDeleteSelection, setShowDeleteSelection] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deleteScope, setDeleteScope] = useState<"me" | "all">("me");
+
+  const handleDeleteAllClick = () => {
+    if (files.length === 0) return;
+    if (isRoomOwner) {
+      setShowDeleteSelection(true);
+    } else {
+      setDeleteScope("me");
+      setShowDeleteConfirmation(true);
+    }
+  };
+
+  const confirmDeleteAll = async () => {
+    try {
+      const url = `${
+        import.meta.env.VITE_API_URL || "http://localhost:8080"
+      }/api/rooms/${roomSlug}/files${deleteScope === "me" ? "?user=me" : ""}`;
+
+      await axios.delete(url, {
+        headers: { "X-User-ID": userId },
+      });
+
+      const yMeta = ydoc.getMap("meta");
+      yMeta.set("lastUpload", Date.now());
+
+      // Optimistic update
+      if (deleteScope === "me") {
+        setFiles((prev) => prev.filter((f) => f.uploaderId !== userId));
+      } else {
+        setFiles([]);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete files");
     }
   };
 
@@ -253,7 +296,14 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
           <div className="liquid-glass-distortion right"></div>
         </div>
 
-        <div className="header-content">
+        <div
+          className="header-content"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <h3>Files</h3>
             <span className="badge">{files.length}</span>
@@ -271,15 +321,28 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
               }
             }}
           />
-          <button
-            className="btn-icon"
-            onClick={() =>
-              document.getElementById("file-upload-input")?.click()
-            }
-            title="Upload File"
-          >
-            <Upload size={18} />
-          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            {files.length > 0 && (
+              <button
+                onClick={handleDeleteAllClick}
+                className="btn-icon"
+                title="Delete All Files"
+                style={{ color: "#ff4d4f" }}
+              >
+                <Trash size={18} />
+              </button>
+            )}
+            <button
+              onClick={() =>
+                document.getElementById("file-upload-input")?.click()
+              }
+              className="btn-icon"
+              title="Upload File"
+              disabled={activeUploads.length > 0}
+            >
+              <Upload size={20} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -418,6 +481,100 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
           })
         )}
       </div>
+
+      {/* Delete Selection Modal (Custom for Owner) */}
+      {showDeleteSelection &&
+        createPortal(
+          <div
+            className="confirmation-modal-overlay"
+            onClick={() => setShowDeleteSelection(false)}
+            style={{ zIndex: 10001 }}
+          >
+            <div
+              className="confirmation-modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="confirmation-modal-header">
+                <h3>Delete Options</h3>
+                <button
+                  className="btn-icon"
+                  onClick={() => setShowDeleteSelection(false)}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="confirmation-modal-body">
+                <p style={{ marginBottom: "16px", marginTop: 0 }}>
+                  Choose which files you want to delete data for.
+                </p>
+                <div className="selection-grid">
+                  <button
+                    className="selection-card"
+                    onClick={() => {
+                      setDeleteScope("me");
+                      setShowDeleteSelection(false);
+                      setShowDeleteConfirmation(true);
+                    }}
+                    disabled={
+                      files.filter((f) => f.uploaderId === userId).length === 0
+                    }
+                  >
+                    <div className="card-icon">
+                      <User size={20} />
+                    </div>
+                    <div className="card-content">
+                      <span className="card-title">Delete My Files</span>
+                      <span className="card-desc">
+                        Remove{" "}
+                        {files.filter((f) => f.uploaderId === userId).length}{" "}
+                        files uploaded by you
+                      </span>
+                    </div>
+                  </button>
+
+                  <button
+                    className="selection-card danger"
+                    onClick={() => {
+                      setDeleteScope("all");
+                      setShowDeleteSelection(false);
+                      setShowDeleteConfirmation(true);
+                    }}
+                  >
+                    <div className="card-icon">
+                      <Trash2 size={20} />
+                    </div>
+                    <div className="card-content">
+                      <span className="card-title">Delete All Files</span>
+                      <span className="card-desc">
+                        Clear the entire room ({files.length} files)
+                      </span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Final Confirmation Modal */}
+      {showDeleteConfirmation && (
+        <ConfirmationModal
+          isOpen={showDeleteConfirmation}
+          onClose={() => setShowDeleteConfirmation(false)}
+          onConfirm={confirmDeleteAll}
+          title={
+            deleteScope === "all" ? "Delete All Files?" : "Delete My Files?"
+          }
+          message={
+            deleteScope === "all"
+              ? "Are you sure you want to delete ALL files in this room? This action cannot be undone."
+              : "Are you sure you want to delete all your files? This action cannot be undone."
+          }
+          confirmText="Delete"
+          isDangerous={true}
+        />
+      )}
     </div>
   );
 };
