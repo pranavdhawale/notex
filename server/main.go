@@ -89,8 +89,16 @@ func main() {
 		port = "8080"
 	}
 
+	srv := &http.Server{
+		Addr:           ":" + port,
+		Handler:        r,
+		ReadTimeout:    10 * time.Minute, // Allow large file uploads
+		WriteTimeout:   10 * time.Minute,
+		MaxHeaderBytes: 1 << 20,
+	}
+
 	log.Printf("Server starting on port %s", port)
-	if err := r.Run(":" + port); err != nil {
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Failed to run server: %v", err)
 	}
 }
