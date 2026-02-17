@@ -10,6 +10,7 @@ import {
   Music,
   Code,
   Download,
+  Loader2,
 } from "lucide-react";
 import "./FilesModal.css";
 
@@ -29,6 +30,8 @@ interface FilesModalProps {
   onUpload: (file: File) => Promise<void>;
   onDelete: (fileId: string) => Promise<void>;
   uploading: boolean;
+  uploadProgress?: number;
+  uploadSpeed?: string;
   userId: string;
   roomSlug: string;
   isRoomOwner: boolean;
@@ -41,6 +44,8 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   onUpload,
   onDelete,
   uploading,
+  uploadProgress = 0,
+  uploadSpeed = "",
   userId,
   roomSlug,
   isRoomOwner,
@@ -160,21 +165,73 @@ export const FilesModal: React.FC<FilesModalProps> = ({
           )}
         </div>
 
-        <div className="files-modal-footer">
-          <input
-            ref={fileInputRef}
-            type="file"
-            onChange={handleFileSelect}
-            style={{ display: "none" }}
-          />
-          <button
-            className="upload-button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
+        <div
+          className="files-modal-footer"
+          style={{ flexDirection: "column", gap: "10px" }}
+        >
+          {uploading && (
+            <div style={{ width: "100%", padding: "0 10px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "4px",
+                  fontSize: "12px",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                <span>Uploading...</span>
+                <span>
+                  {uploadSpeed} • {uploadProgress}%
+                </span>
+              </div>
+              <div
+                style={{
+                  width: "100%",
+                  height: "4px",
+                  background: "rgba(255,255,255,0.1)",
+                  borderRadius: "2px",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${uploadProgress}%`,
+                    height: "100%",
+                    background: "var(--accent-color, #3b82f6)",
+                    transition: "width 0.2s ease-out",
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          <div
+            style={{
+              display: "flex",
+              width: "100%",
+              justifyContent: "flex-end",
+            }}
           >
-            <Upload size={18} />
-            {uploading ? "Uploading..." : "Upload File"}
-          </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileSelect}
+              style={{ display: "none" }}
+            />
+            <button
+              className="upload-button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              style={{ width: "auto" }}
+            >
+              {uploading ? (
+                <Loader2 className="animate-spin" size={18} />
+              ) : (
+                <Upload size={18} />
+              )}
+              {uploading ? "Uploading..." : "Upload File"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
