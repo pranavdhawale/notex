@@ -70,6 +70,7 @@ func main() {
 		apiGroup.POST("/upload/:room", api.UploadFile)
 		apiGroup.GET("/rooms/:room/files", api.ListFiles)
 		apiGroup.GET("/rooms/:room/files/:fileId/download", api.DownloadFile)
+		apiGroup.DELETE("/rooms/:room/files", api.DeleteAllFiles)
 		apiGroup.DELETE("/rooms/:room/files/:fileId", api.DeleteFile)
 	}
 
