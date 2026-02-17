@@ -11,6 +11,7 @@ import {
   Music,
   Code,
   X,
+  Download,
 } from "lucide-react";
 
 interface FilesSidebarProps {
@@ -376,7 +377,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
                   <a
                     href={`${
                       import.meta.env.VITE_API_URL || "http://localhost:8080"
-                    }${f.url}`}
+                    }/api/rooms/${roomSlug}/files/${f.id}/download`}
                     target="_blank"
                     rel="noopener noreferrer"
                     title={f.name}
@@ -387,14 +388,30 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
                     {(f.size / 1024 / 1024).toFixed(2)} MB
                   </span>
                 </div>
-                {canDelete && (
-                  <button
-                    onClick={() => handleDeleteFile(f.id)}
-                    className="btn-icon delete"
+                <div
+                  className="file-actions"
+                  style={{ display: "flex", gap: "4px" }}
+                >
+                  <a
+                    href={`${
+                      import.meta.env.VITE_API_URL || "http://localhost:8080"
+                    }/api/rooms/${roomSlug}/files/${f.id}/download`}
+                    className="btn-icon"
+                    title="Download"
+                    download
                   >
-                    <Trash2 size={14} />
-                  </button>
-                )}
+                    <Download size={14} />
+                  </a>
+                  {canDelete && (
+                    <button
+                      onClick={() => handleDeleteFile(f.id)}
+                      className="btn-icon delete"
+                      title="Delete"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })
