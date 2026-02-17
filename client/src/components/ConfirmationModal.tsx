@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, AlertTriangle } from "lucide-react";
 import "./ConfirmationModal.css";
@@ -24,6 +24,20 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   cancelText = "Cancel",
   isDangerous = false,
 }) => {
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return createPortal(

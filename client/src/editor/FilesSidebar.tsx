@@ -13,8 +13,8 @@ import {
   Code,
   X,
   Download,
-  Trash,
-  User,
+  FolderX,
+  FileMinus,
 } from "lucide-react";
 import { ConfirmationModal } from "../components/ConfirmationModal";
 
@@ -329,7 +329,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
                 title="Delete All Files"
                 style={{ color: "#ff4d4f" }}
               >
-                <Trash size={18} />
+                <FolderX size={18} />
               </button>
             )}
             <button
@@ -488,6 +488,12 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
           <div
             className="confirmation-modal-overlay"
             onClick={() => setShowDeleteSelection(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setShowDeleteSelection(false);
+              }
+            }}
+            tabIndex={0}
             style={{ zIndex: 10001 }}
           >
             <div
@@ -520,7 +526,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
                     }
                   >
                     <div className="card-icon">
-                      <User size={20} />
+                      <FileMinus size={20} />
                     </div>
                     <div className="card-content">
                       <span className="card-title">Delete My Files</span>
@@ -541,7 +547,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
                     }}
                   >
                     <div className="card-icon">
-                      <Trash2 size={20} />
+                      <FolderX size={20} />
                     </div>
                     <div className="card-content">
                       <span className="card-title">Delete All Files</span>
