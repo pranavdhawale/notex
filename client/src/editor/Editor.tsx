@@ -22,6 +22,7 @@ import { FilesSidebar } from "./FilesSidebar";
 import { UsersSidebar } from "./UsersSidebar";
 import { FilesModal } from "./FilesModal";
 import { Toolbar } from "./Toolbar";
+import { TableContextMenu } from "./TableContextMenu";
 import axios from "axios";
 import { Users, LogOut, Trash, Save, Loader2, File } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -76,6 +77,7 @@ const TiptapEditor: React.FC<{
   initialContent,
 }) => {
   const [debouncer, setDebouncer] = useState<ReturnType<typeof setTimeout>>();
+  const [menuState, setMenuState] = useState({ isOpen: false, x: 0, y: 0 });
 
   const editor = useEditor({
     extensions: [
@@ -118,6 +120,32 @@ const TiptapEditor: React.FC<{
       if (debouncer) clearTimeout(debouncer);
     };
   }, [debouncer]);
+
+  // Handle right-click context menu for tables
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (!editor) return;
+
+    const target = e.target as HTMLElement;
+    // Check if the right-click occurred inside a table
+    const isInsideTable = target.closest('table') !== null || target.closest('td') !== null || target.closest('th') !== null || editor.isActive('table');
+
+    if (isInsideTable) {
+      e.preventDefault();
+      // Set the cursor position to the clicked element if possible, 
+      // though Tiptap usually handles this automatically on mousedown.
+      
+      setMenuState({
+        isOpen: true,
+        x: e.clientX,
+        y: e.clientY,
+      });
+    } else {
+      // If clicking outside a table, just let native menu show or close our menu
+      if (menuState.isOpen) {
+        setMenuState(prev => ({ ...prev, isOpen: false }));
+      }
+    }
+  };
 
   return (
     <div
@@ -236,7 +264,16 @@ const TiptapEditor: React.FC<{
           <Toolbar editor={editor} />
         </div>
 
-        <EditorContent editor={editor} />
+        <TableContextMenu 
+          editor={editor} 
+          isOpen={menuState.isOpen}
+          x={menuState.x}
+          y={menuState.y}
+          onClose={() => setMenuState(prev => ({ ...prev, isOpen: false }))}
+        />
+        <div onContextMenu={handleContextMenu} style={{ minHeight: '100%' }}>
+          <EditorContent editor={editor} />
+        </div>
       </div>
     </div>
   );
