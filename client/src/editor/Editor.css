@@ -182,6 +182,226 @@
   background: var(--accent-color);
 }
 
+/* --- Tiptap Elements Styling Overrides --- */
+
+/* Task Lists & Checkboxes */
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none; /* remove ugly bullet point */
+  padding: 0;
+  margin: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] > li {
+  display: flex !important;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  list-style: none;
+}
+
+.ProseMirror ul[data-type="taskList"] > li > label {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: auto;
+  margin: 0;
+  user-select: none;
+  cursor: pointer;
+  padding-top: 0.15rem; /* align checkbox with text baseline */
+}
+
+.ProseMirror ul[data-type="taskList"] > li > div {
+  flex: 1 1 auto;
+  min-width: 0; /* allow wrapping without pushing checkbox */
+}
+
+.ProseMirror ul[data-type="taskList"] > li > div > p {
+  margin: 0; /* avoid "second line" look from paragraph margins */
+}
+
+.ProseMirror ul[data-type="taskList"] > li > label input[type="checkbox"] {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 0;
+  color: var(--text-main);
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  display: inline-grid;
+  place-content: center;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.ProseMirror ul[data-type="taskList"] > li > label input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.35);
+}
+
+.ProseMirror ul[data-type="taskList"] > li > label input[type="checkbox"]::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  transform: scale(0);
+  background-color: rgba(255, 255, 255, 0.95);
+  transition: 120ms transform ease-in-out;
+}
+
+.ProseMirror ul[data-type="taskList"] > li > label input[type="checkbox"]:checked {
+  background-color: var(--color-primary); /* Apple blue accent */
+  border-color: var(--color-primary);
+}
+
+.ProseMirror ul[data-type="taskList"] > li > label input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+
+.ProseMirror ul[data-type="taskList"] > li[data-checked="true"] > div {
+  text-decoration: line-through;
+  opacity: 0.6; /* text dim when checked */
+  transition: all 0.2s ease;
+}
+
+/* Code Blocks */
+.ProseMirror pre {
+  background: #1e1e1e; /* consistent dark terminal look */
+  border-radius: 8px;
+  color: #e5e5e5;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.ProseMirror pre code {
+  color: inherit;
+  padding: 0;
+  background: none;
+  font-size: 0.9em;
+}
+
+/* Inline Code */
+.ProseMirror code:not(pre code) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fca5a5; /* slight distinct color for inline code */
+  border-radius: 4px;
+  padding: 0.2em 0.4em;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 0.9em;
+}
+
+/* Blockquotes */
+.ProseMirror blockquote {
+  border-left: 4px solid var(--color-primary); /* Blue accent border */
+  margin: 1.5rem 0;
+  padding: 0.5rem 0 0.5rem 1.2rem;
+  background: var(--btn-bg-idle); /* slight background to distinguish */
+  border-radius: 0 8px 8px 0;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.ProseMirror blockquote p {
+  margin: 0; /* prevent extra spacing inside quote */
+}
+
+/* Tables */
+.ProseMirror .tableWrapper {
+  display: block;      /* Ensure it's a block-level element */
+  width: 100%;         /* Constrain to the editor width */
+  max-width: 100%;     /* Never let wrapper grow beyond the editor */
+  overflow-x: auto;   /* Only scroll the table inside, not the whole page */
+  margin: 1.5rem 0;
+}
+
+.ProseMirror .tableWrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.ProseMirror .tableWrapper::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+  table-layout: fixed; /* Required for Tiptap column dragging */
+  width: 100%;         /* Default: up to 4 columns fills the editor  */
+  overflow: hidden;
+  margin: 0;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/*
+  Proportional scaling: when we add a 5th column we want the existing 4 columns
+  to keep the SAME visual width. In a 100%-wide fixed table, each of 4 cols = 25%.
+  Adding a 5th means table must be 125% wide (5 × 25%) so the wrapper scrolls,
+  not squishes.
+  Formula: width = N_cols × (100% / 4) = N_cols × 25%
+*/
+.ProseMirror table:has(tr > :nth-child(5))  { width: 125%; }
+.ProseMirror table:has(tr > :nth-child(6))  { width: 150%; }
+.ProseMirror table:has(tr > :nth-child(7))  { width: 175%; }
+.ProseMirror table:has(tr > :nth-child(8))  { width: 200%; }
+.ProseMirror table:has(tr > :nth-child(9))  { width: 225%; }
+.ProseMirror table:has(tr > :nth-child(10)) { width: 250%; }
+.ProseMirror table:has(tr > :nth-child(11)) { width: 275%; }
+.ProseMirror table:has(tr > :nth-child(12)) { width: 300%; }
+
+.ProseMirror td,
+.ProseMirror th {
+  min-width: 120px; 
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 10px 14px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.ProseMirror th {
+  font-weight: bold;
+  text-align: left;
+  background-color: rgba(255, 255, 255, 0.08); /* slightly lighter header */
+  color: var(--text-main);
+}
+
+.ProseMirror td {
+  background-color: rgba(255, 255, 255, 0.02); /* very subtle fill */
+}
+
+.ProseMirror p {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ProseMirror .selectedCell:after {
+  z-index: 2;
+  position: absolute;
+  content: "";
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(0, 122, 255, 0.2); /* standard selection blue */
+  pointer-events: none;
+}
+
+.ProseMirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: var(--color-primary);
+  pointer-events: none;
+}
+
 /* --- Files Styling --- */
 .files-list {
   flex: 1;
