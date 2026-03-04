@@ -20,8 +20,7 @@ import {
   AlignRight, 
   AlignJustify, 
   Link, 
-  Table as TableIcon, 
-  XSquare 
+  Table as TableIcon
 } from "lucide-react";
 
 interface ToolbarProps {
@@ -219,14 +218,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editor }) => {
           title="Insert Table"
         >
           <TableIcon size={16} />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().deleteTable().run()}
-          disabled={!editor.can().deleteTable()}
-          className="toolbar-btn-circle"
-          title="Delete Table"
-        >
-          <XSquare size={16} />
         </button>
       </div>
     </div>
