@@ -449,6 +449,7 @@
 
 .file-item-glass {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -579,6 +580,7 @@
 
 .user-card {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 12px;
   padding: 8px;
