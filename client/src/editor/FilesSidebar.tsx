@@ -359,6 +359,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
                   borderRadius: "8px",
                   marginBottom: "8px",
                   border: "1px solid rgba(255, 255, 255, 0.1)",
+                  flexShrink: 0,
                 }}
               >
                 <div
