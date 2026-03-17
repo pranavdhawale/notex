@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Collaboration from "@tiptap/extension-collaboration";
@@ -24,7 +24,7 @@ import { FilesModal } from "./FilesModal";
 import { Toolbar } from "./Toolbar";
 import { TableContextMenu } from "./TableContextMenu";
 import axios from "axios";
-import { Users, LogOut, Trash, Save, Loader2, File } from "lucide-react";
+import { Users, LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cacheManager } from "../utils/SmartCacheManager";
 import { NotFoundView } from "../components/NotFoundView";
@@ -78,6 +78,9 @@ const TiptapEditor: React.FC<{
 }) => {
   const [debouncer, setDebouncer] = useState<ReturnType<typeof setTimeout>>();
   const [menuState, setMenuState] = useState({ isOpen: false, x: 0, y: 0 });
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const scrollHideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const editor = useEditor({
     extensions: [
@@ -102,6 +105,13 @@ const TiptapEditor: React.FC<{
       TableCell,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
     ],
+    editorProps: {
+      attributes: {
+        class: "ProseMirror",
+      },
+      scrollThreshold: { top: 80, bottom: 40, left: 0, right: 0 },
+      scrollMargin: { top: 80, bottom: 40, left: 0, right: 0 },
+    },
     content: initialContent,
     onUpdate: ({ editor }) => {
       // Debounced save to SessionStorage (JSON content)
@@ -120,6 +130,40 @@ const TiptapEditor: React.FC<{
       if (debouncer) clearTimeout(debouncer);
     };
   }, [debouncer]);
+
+  // Auto-hide scrollbar + track scroll position
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      setScrollTop(el.scrollTop);
+
+      // Show scrollbar
+      el.classList.add("is-scrolling");
+
+      // Hide again after 1500ms of inactivity
+      if (scrollHideTimer.current) clearTimeout(scrollHideTimer.current);
+      scrollHideTimer.current = setTimeout(() => {
+        el.classList.remove("is-scrolling");
+      }, 1500);
+    };
+
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+      if (scrollHideTimer.current) clearTimeout(scrollHideTimer.current);
+    };
+  }, []);
+
+  const scrollToTop = () =>
+    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+
+  const scrollToEnd = () =>
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
 
   // Handle right-click context menu for tables
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -157,7 +201,7 @@ const TiptapEditor: React.FC<{
         position: "relative",
       }}
     >
-      <div style={{ flex: 1, overflow: "auto", position: "relative" }}>
+      <div ref={scrollRef} style={{ flex: 1, overflow: "auto", position: "relative", scrollPaddingTop: "80px" }}>
         {/* Unified Sticky Header */}
         <div className="sticky-header-glass">
           {/* Single Liquid Glass Background */}
@@ -274,6 +318,24 @@ const TiptapEditor: React.FC<{
         <div onContextMenu={handleContextMenu} style={{ minHeight: '100%' }}>
           <EditorContent editor={editor} />
         </div>
+      </div>
+
+      {/* Scroll Navigation FABs */}
+      <div className="scroll-nav-group">
+        <button
+          className={`scroll-nav-btn ${scrollTop > 200 ? "visible" : "hidden"}`}
+          onClick={scrollToTop}
+          title="Go to Top"
+        >
+          <ArrowUp size={16} />
+        </button>
+        <button
+          className="scroll-nav-btn visible"
+          onClick={scrollToEnd}
+          title="Go to End"
+        >
+          <ArrowDown size={16} />
+        </button>
       </div>
     </div>
   );
