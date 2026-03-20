@@ -9,86 +9,75 @@
   justify-content: center;
   align-items: center;
   z-index: 9999;
-  transition: opacity 0.5s ease-out;
 }
 
-.startup-container.fade-out {
-  opacity: 0;
-  pointer-events: none;
+.typewriter-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
 }
 
-/* Wrapper stays centered */
-.logo-wrapper {
-  position: relative;
+.typewriter-container {
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: "Inter", system-ui, sans-serif;
   font-weight: 800;
-  letter-spacing: -1.5px;
-}
-
-/* 
-  State 0: Huge X 
-  State 1: NoteX (centered) with color change
-  State 2: Fade out
-*/
-
-.x-mark {
-  /* Initial State: Giant Purple X */
-  font-size: 10rem;
-  color: #8b5cf6;
-  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-
-  /* Transition Properties */
-  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-  transform: scale(1);
-  filter: drop-shadow(0 0 30px rgba(139, 92, 246, 0.6));
-}
-
-.x-mark.shrink {
-  /* Final size with color change */
   font-size: 3.5rem;
-  transform: translateX(0);
-  filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.3));
+  letter-spacing: -1.5px;
+
+  /* Shared gradient variables */
+  --gradient-light: var(--text-main);
+  --gradient-purple: #a78bfa;
+  --gradient-accent: #7c3aed;
 }
 
-.x-mark.finalize {
-  /* Matches purple accent */
-  background: #8b5cf6;
-  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
+/* Base letter style - all share the SAME gradient */
+.brand-letter {
+  /* Single continuous gradient spanning full "NoteX" */
+  background: linear-gradient(
+    to right,
+    var(--gradient-light) 0%,
+    var(--gradient-purple) 40%,
+    var(--gradient-accent) 100%
+  );
+  /* Gradient is sized larger than each letter so position matters */
+  background-size: 250% 100%;
+  /* Default position - N takes from start of gradient */
+  background-position: 0% center;
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: none;
 }
 
-.prefix {
-  /* Initial State: Hidden and offset */
-  font-size: 3.5rem; /* Matches LandingPage h1 size */
-  color: white;
-  opacity: 0;
-  width: 0;
+/* Middle text container - expands to reveal "ote" */
+.typewriter-text-middle {
+  display: inline-flex;
+  align-items: center;
   overflow: hidden;
   white-space: nowrap;
-  transform: translateX(-20px);
-
-  /* Transition Properties */
-  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-
-  background: linear-gradient(to right, var(--text-main), #7c3aed);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
-.prefix.visible {
-  /* Final State: Visible and expanded */
-  opacity: 1;
-  width: auto;
-  transform: translateX(0);
-  margin-right: 0px; /* Adjust spacing to 'X' */
+/* "ote" samples from middle of gradient */
+.typewriter-text-middle .brand-letter {
+  background-position: 40% center;
+}
+
+/* X is larger and samples from end of gradient */
+.brand-letter-x {
+  font-size: 4rem;
+  background-position: 100% center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .typewriter-container {
+    font-size: 2.5rem;
+  }
+
+  .brand-letter-x {
+    font-size: 2.8rem;
+  }
 }
