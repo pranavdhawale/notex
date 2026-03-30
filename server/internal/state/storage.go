@@ -1,0 +1,44 @@
+package state
+
+import (
+	"log"
+	"os"
+
+	"github.com/pranavdhawale/notex/server/internal/storage"
+)
+
+// MinIOClient is the global MinIO storage client
+var MinIOClient *storage.MinIOClient
+
+// InitMinIO initializes the MinIO storage client
+func InitMinIO() {
+	endpoint := os.Getenv("MINIO_ENDPOINT")
+	if endpoint == "" {
+		endpoint = "localhost:9000"
+	}
+
+	accessKey := os.Getenv("MINIO_ACCESS_KEY")
+	if accessKey == "" {
+		accessKey = "minioadmin"
+	}
+
+	secretKey := os.Getenv("MINIO_SECRET_KEY")
+	if secretKey == "" {
+		secretKey = "minioadmin123"
+	}
+
+	useSSL := os.Getenv("MINIO_USE_SSL") == "true"
+
+	bucket := os.Getenv("MINIO_BUCKET")
+	if bucket == "" {
+		bucket = "notex-uploads"
+	}
+
+	var err error
+	MinIOClient, err = storage.NewMinIOClient(endpoint, accessKey, secretKey, useSSL, bucket)
+	if err != nil {
+		log.Fatalf("Failed to connect to MinIO: %v", err)
+	}
+
+	log.Printf("Connected to MinIO at %s, bucket: %s", endpoint, bucket)
+}

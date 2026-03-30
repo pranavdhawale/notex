@@ -3,8 +3,8 @@ package api
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -19,11 +19,7 @@ const MaxFileSize = 200 * 1024 * 1024 // 200MB
 
 func UploadFile(c *gin.Context) {
 	roomID := c.Param("room")
-	roomParam := c.Param("room") // slug acts as room ID
-	
-	// Validate room exists? For V1 speed, we assume slug is valid or create folder on fly.
-	// We'll trust the path param.
-	
+
 	file, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
@@ -35,62 +31,67 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 
-	// Create uploads directory for room
-	uploadDir := fmt.Sprintf("uploads/%s", roomParam)
-	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
-		return
-	}
-
-	// Save file with unique ID
+	// Generate unique ID and storage key
 	ext := filepath.Ext(file.Filename)
 	uniqueId := uuid.New().String()
-	storedFilename := fmt.Sprintf("%s%s", uniqueId, ext)
-	dst := filepath.Join(uploadDir, storedFilename)
+	storageKey := fmt.Sprintf("%s/%s%s", roomID, uniqueId, ext)
 
-	if err := c.SaveUploadedFile(file, dst); err != nil {
-		os.Remove(dst) // Ensure partial file is cleaned up
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
+	// Open the uploaded file
+	fileHandle, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read file"})
+		return
+	}
+	defer fileHandle.Close()
+
+	// Upload to MinIO
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	err = state.MinIOClient.Upload(ctx, storageKey, fileHandle, file.Size, "application/octet-stream")
+	if err != nil {
+		log.Printf("MinIO upload error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload file"})
 		return
 	}
 
 	// Create File Record
 	fileRecord := models.File{
-		ID:        uniqueId,
-		RoomID:    roomID, // using slug as ID for now
-		UploaderID: c.GetString("userID"), // Get from auth middleware
-		Name:      file.Filename,
-		Size:      file.Size,
-		Path:      dst,
-		CreatedAt: time.Now(),
+		ID:         uniqueId,
+		RoomID:     roomID,
+		UploaderID: c.GetString("userID"),
+		Name:       file.Filename,
+		Size:       file.Size,
+		StorageKey: storageKey,
+		CreatedAt:  time.Now(),
 	}
 
 	// Save to Mongo
 	collection := state.MongoDatabase.Collection("files")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel2()
 
-	_, err = collection.InsertOne(ctx, fileRecord)
+	_, err = collection.InsertOne(ctx2, fileRecord)
 	if err != nil {
-		os.Remove(dst) // Cleanup
+		// Try to cleanup MinIO on database failure
+		state.MinIOClient.Delete(context.Background(), storageKey)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
 
-	// Construct public URL
-	fileRecord.URL = fmt.Sprintf("/uploads/%s/%s", roomParam, storedFilename)
+	// Construct download URL
+	fileRecord.URL = fmt.Sprintf("/api/rooms/%s/files/%s/download", roomID, uniqueId)
 
 	c.JSON(http.StatusCreated, fileRecord)
 }
 
-// ListFiles - helper to get files for a room
+// ListFiles returns all files for a room
 func ListFiles(c *gin.Context) {
 	roomID := c.Param("room")
-	
+
 	collection := state.MongoDatabase.Collection("files")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
 
 	cursor, err := collection.Find(ctx, bson.M{"room_id": roomID})
 	if err != nil {
@@ -106,73 +107,14 @@ func ListFiles(c *gin.Context) {
 	}
 
 	// Enrich with URLs
-	for i, f := range files {
-		// filename is derived from Path
-		_, fname := filepath.Split(f.Path)
-		files[i].URL = fmt.Sprintf("/uploads/%s/%s", f.RoomID, fname)
+	for i := range files {
+		files[i].URL = fmt.Sprintf("/api/rooms/%s/files/%s/download", roomID, files[i].ID)
 	}
 
 	c.JSON(http.StatusOK, files)
 }
 
-func DeleteFile(c *gin.Context) {
-	roomID := c.Param("room")
-	fileID := c.Param("fileId")
-	requestorID := c.GetString("userID")
-
-	if requestorID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Authentication required"})
-		return
-	}
-
-	collection := state.MongoDatabase.Collection("files")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// 1. Fetch File Metadata
-	var file models.File
-	err := collection.FindOne(ctx, bson.M{"_id": fileID, "room_id": roomID}).Decode(&file)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
-		return
-	}
-
-	// 2. Check Permissions
-	canDelete := false
-	if file.UploaderID != "" && file.UploaderID == requestorID {
-		canDelete = true
-	} else {
-		// Check if requestor is Room Owner
-		roomCollection := state.MongoDatabase.Collection("rooms")
-		var room models.Room
-		err := roomCollection.FindOne(ctx, bson.M{"slug": roomID}).Decode(&room)
-		
-		fmt.Printf("DEBUG DELETE: FileID=%s Requestor=%s Uploader=%s RoomOwner=%s (Error=%v)\n", 
-			fileID, requestorID, file.UploaderID, room.Owner, err)
-
-		if err == nil && room.Owner == requestorID {
-			canDelete = true
-		}
-	}
-
-	if !canDelete {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied"})
-		return
-	}
-
-	// 3. Delete from DB
-	_, err = collection.DeleteOne(ctx, bson.M{"_id": fileID})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
-		return
-	}
-
-	// 4. Delete from Disk
-	os.Remove(file.Path)
-
-	c.JSON(http.StatusOK, gin.H{"message": "File deleted"})
-}
-
+// DownloadFile streams a file from MinIO to the client
 func DownloadFile(c *gin.Context) {
 	roomID := c.Param("room")
 	fileID := c.Param("fileId")
@@ -188,26 +130,92 @@ func DownloadFile(c *gin.Context) {
 		return
 	}
 
-	// Check if file exists on disk
-	if _, err := os.Stat(file.Path); os.IsNotExist(err) {
+	// Stream from MinIO
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel2()
+
+	reader, err := state.MinIOClient.Download(ctx2, file.StorageKey)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "File content missing"})
 		return
 	}
+	defer reader.Close()
 
-	// Security headers to prevent execution and MIME sniffing
+	// Security headers
 	c.Header("Content-Type", "application/octet-stream")
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("X-Frame-Options", "DENY")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", file.Name))
 	c.Header("Cache-Control", "private, max-age=3600")
 
-	c.File(file.Path)
+	// Stream to client
+	c.DataFromReader(http.StatusOK, file.Size, "application/octet-stream", reader, nil)
 }
 
+// DeleteFile removes a file from MinIO and MongoDB
+func DeleteFile(c *gin.Context) {
+	roomID := c.Param("room")
+	fileID := c.Param("fileId")
+	requestorID := c.GetString("userID")
+
+	if requestorID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Authentication required"})
+		return
+	}
+
+	collection := state.MongoDatabase.Collection("files")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Fetch File Metadata
+	var file models.File
+	err := collection.FindOne(ctx, bson.M{"_id": fileID, "room_id": roomID}).Decode(&file)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+		return
+	}
+
+	// Check Permissions
+	canDelete := false
+	if file.UploaderID != "" && file.UploaderID == requestorID {
+		canDelete = true
+	} else {
+		// Check if requestor is Room Owner
+		roomCollection := state.MongoDatabase.Collection("rooms")
+		var room models.Room
+		err := roomCollection.FindOne(ctx, bson.M{"slug": roomID}).Decode(&room)
+		if err == nil && room.Owner == requestorID {
+			canDelete = true
+		}
+	}
+
+	if !canDelete {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied"})
+		return
+	}
+
+	// Delete from DB first (auth check done)
+	_, err = collection.DeleteOne(ctx, bson.M{"_id": fileID})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	// Delete from MinIO (best effort)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel2()
+	if err := state.MinIOClient.Delete(ctx2, file.StorageKey); err != nil {
+		log.Printf("Warning: failed to delete from MinIO: %v", err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "File deleted"})
+}
+
+// DeleteAllFiles removes multiple files from MinIO and MongoDB
 func DeleteAllFiles(c *gin.Context) {
 	roomID := c.Param("room")
 	requestorID := c.GetString("userID")
-	targetUser := c.Query("user") // "me" or empty
+	targetUser := c.Query("user")
 
 	if requestorID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Authentication required"})
@@ -218,10 +226,10 @@ func DeleteAllFiles(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// 1. Determine Filter
+	// Determine Filter
 	filter := bson.M{"room_id": roomID}
 
-	// 2. Check Permissions
+	// Check Permissions
 	roomCollection := state.MongoDatabase.Collection("rooms")
 	var room models.Room
 	err := roomCollection.FindOne(ctx, bson.M{"slug": roomID}).Decode(&room)
@@ -231,17 +239,15 @@ func DeleteAllFiles(c *gin.Context) {
 	}
 
 	if targetUser == "me" {
-		// User deletes ONLY their own files
 		filter["uploader_id"] = requestorID
 	} else {
-		// Delete ALL files - Requires Room Ownership
 		if room.Owner != requestorID {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Only room owner can delete all files"})
 			return
 		}
 	}
 
-	// 3. Find files to delete (to remove from disk)
+	// Find files to delete
 	cursor, err := collection.Find(ctx, filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
@@ -260,18 +266,23 @@ func DeleteAllFiles(c *gin.Context) {
 		return
 	}
 
-	// 4. Delete from DB
+	// Delete from DB
 	_, err = collection.DeleteMany(ctx, filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete from database"})
 		return
 	}
 
-	// 5. Delete from Disk (Best effort)
+	// Delete from MinIO (best effort)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel2()
+
 	deletedCount := 0
 	for _, f := range files {
-		if err := os.Remove(f.Path); err == nil {
+		if err := state.MinIOClient.Delete(ctx2, f.StorageKey); err == nil {
 			deletedCount++
+		} else {
+			log.Printf("Warning: failed to delete %s from MinIO: %v", f.StorageKey, err)
 		}
 	}
 
