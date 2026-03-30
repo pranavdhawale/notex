@@ -2,6 +2,7 @@ package utils
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -130,8 +131,21 @@ func GenerateUserID() string {
 func generateRandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, length)
+	randomBytes := make([]byte, length)
+
+	// Use crypto/rand for cryptographically secure randomness
+	if _, err := rand.Read(randomBytes); err != nil {
+		// This should never happen with crypto/rand on supported platforms
+		// Fall back to current timestamp (not ideal, but better than crashing)
+		log.Printf("WARNING: crypto/rand failed: %v, falling back to timestamp", err)
+		for i := range b {
+			b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
+		}
+		return string(b)
+	}
+
 	for i := range b {
-		b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
+		b[i] = charset[int(randomBytes[i])%len(charset)]
 	}
 	return string(b)
 }
