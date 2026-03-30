@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -38,6 +39,16 @@ func main() {
 		mongoURI = "mongodb://localhost:27017"
 	}
 	state.InitMongo(mongoURI, "notex")
+
+	// Initialize MinIO
+	state.InitMinIO()
+
+	// Ensure MinIO bucket exists
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := state.MinIOClient.EnsureBucket(ctx); err != nil {
+		log.Fatalf("Failed to ensure MinIO bucket: %v", err)
+	}
 
 	//redisAddr := os.Getenv("REDIS_ADDR")
 	//if redisAddr == "" {
