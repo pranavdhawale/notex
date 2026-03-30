@@ -59,9 +59,31 @@ func TestValidateToken_InvalidSignature(t *testing.T) {
 func TestValidateToken_MissingSecret(t *testing.T) {
 	os.Unsetenv("SESSION_SECRET")
 
+	// Set GIN_MODE to release to test production behavior
+	// (in development mode, there's a fallback secret)
+	originalMode := os.Getenv("GIN_MODE")
+	os.Setenv("GIN_MODE", "release")
+	defer os.Setenv("GIN_MODE", originalMode)
+
 	_, err := ValidateToken("any.token")
 	if err != ErrMissingSecret {
 		t.Errorf("Expected ErrMissingSecret, got %v", err)
+	}
+}
+
+func TestValidateToken_DevFallback(t *testing.T) {
+	os.Unsetenv("SESSION_SECRET")
+	defer os.Unsetenv("SESSION_SECRET")
+
+	// In development mode (GIN_MODE != "release"), should use fallback secret
+	originalMode := os.Getenv("GIN_MODE")
+	os.Unsetenv("GIN_MODE")
+	defer os.Setenv("GIN_MODE", originalMode)
+
+	// Should not error - uses dev fallback
+	_, err := ValidateToken("any.token")
+	if err != ErrInvalidToken {
+		t.Errorf("Expected ErrInvalidToken (due to fallback secret), got %v", err)
 	}
 }
 
