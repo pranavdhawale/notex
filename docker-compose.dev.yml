@@ -12,6 +12,22 @@ services:
     networks:
       - notex-dev-net
 
+  # Object Storage Service
+  minio:
+    image: minio/minio:latest
+    container_name: notex-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+    volumes:
+      - minio_data:/data
+    networks:
+      - notex-dev-net
+
   # Backend Service
   server:
     build:
@@ -27,8 +43,14 @@ services:
       - GIN_MODE=debug
       - MONGO_URI=mongodb://mongo:27017
       - CLIENT_ORIGIN=http://localhost:5173
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_USE_SSL=false
+      - MINIO_BUCKET=notex-uploads
     depends_on:
       - mongo
+      - minio
     networks:
       - notex-dev-net
 
@@ -50,6 +72,7 @@ services:
 
 volumes:
   mongo_data:
+  minio_data:
 
 networks:
   notex-dev-net:
