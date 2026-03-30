@@ -1,15 +1,18 @@
 package ws
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"time"
-	"context"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/pranavdhawale/notex/server/internal/models"
 	"github.com/pranavdhawale/notex/server/internal/state"
+	"github.com/pranavdhawale/notex/server/internal/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -18,7 +21,44 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for v1/localhost
+		origin := r.Header.Get("Origin")
+
+		// Get allowed origins from environment
+		allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
+		if allowedOriginsEnv == "" {
+			// Default to client origin or localhost for development
+			clientOrigin := os.Getenv("CLIENT_ORIGIN")
+			if clientOrigin == "" {
+				clientOrigin = "http://localhost:5173"
+			}
+			allowedOriginsEnv = clientOrigin
+		}
+
+		// In development mode, allow localhost variations
+		ginMode := os.Getenv("GIN_MODE")
+		if ginMode != "release" {
+			// Allow any localhost origin in development
+			if strings.HasPrefix(origin, "http://localhost") ||
+				strings.HasPrefix(origin, "http://127.0.0.1") {
+				return true
+			}
+		}
+
+		// Check against allowed origins
+		allowedOrigins := strings.Split(allowedOriginsEnv, ",")
+		for _, allowed := range allowedOrigins {
+			allowed = strings.TrimSpace(allowed)
+			if origin == allowed {
+				return true
+			}
+			// Also allow the origin without trailing slash
+			if strings.TrimSuffix(origin, "/") == strings.TrimSuffix(allowed, "/") {
+				return true
+			}
+		}
+
+		log.Printf("WebSocket connection rejected from origin: %s", origin)
+		return false
 	},
 }
 
@@ -34,6 +74,19 @@ func ServeWs(hub *Hub, c *gin.Context) {
 		log.Println("No room ID provided in WS connection")
 		http.Error(c.Writer, "Room ID is required", http.StatusBadRequest)
 		return
+	}
+
+	// Validate session token from query parameter (optional, for awareness tracking)
+	token := c.Query("token")
+	if token != "" {
+		session, err := utils.ValidateToken(token)
+		if err != nil {
+			log.Printf("Invalid session token for WebSocket: %v", err)
+			// Continue without user ID - just log the connection
+		} else {
+			// User ID is available for future features (e.g., presence tracking)
+			_ = session.UserID // Currently unused but available
+		}
 	}
 
 	// CHECK: Verify room exists in DB

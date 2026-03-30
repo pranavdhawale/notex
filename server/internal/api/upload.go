@@ -58,7 +58,7 @@ func UploadFile(c *gin.Context) {
 	fileRecord := models.File{
 		ID:        uniqueId,
 		RoomID:    roomID, // using slug as ID for now
-		UploaderID: c.GetHeader("X-User-ID"), // Capture from header
+		UploaderID: c.GetString("userID"), // Get from auth middleware
 		Name:      file.Filename,
 		Size:      file.Size,
 		Path:      dst,
@@ -118,10 +118,10 @@ func ListFiles(c *gin.Context) {
 func DeleteFile(c *gin.Context) {
 	roomID := c.Param("room")
 	fileID := c.Param("fileId")
-	requestorID := c.GetHeader("X-User-ID")
+	requestorID := c.GetString("userID")
 
 	if requestorID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing User ID header"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Authentication required"})
 		return
 	}
 
@@ -194,18 +194,23 @@ func DownloadFile(c *gin.Context) {
 		return
 	}
 
-	// Force download with original filename
+	// Security headers to prevent execution and MIME sniffing
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Header("X-Frame-Options", "DENY")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", file.Name))
+	c.Header("Cache-Control", "private, max-age=3600")
+
 	c.File(file.Path)
 }
 
 func DeleteAllFiles(c *gin.Context) {
 	roomID := c.Param("room")
-	requestorID := c.GetHeader("X-User-ID")
+	requestorID := c.GetString("userID")
 	targetUser := c.Query("user") // "me" or empty
 
 	if requestorID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing User ID header"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Authentication required"})
 		return
 	}
 
