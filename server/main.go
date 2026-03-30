@@ -84,7 +84,8 @@ func main() {
 	})
 
 	// Session endpoint - creates or refreshes session token (public)
-	r.GET("/api/session", func(c *gin.Context) {
+	// Rate limited: 5 new sessions per IP per minute
+	r.GET("/api/session", middleware.RateLimitSession(), func(c *gin.Context) {
 		// Check if user already has a valid token
 		authHeader := c.GetHeader("Authorization")
 		var userID string
@@ -124,7 +125,8 @@ func main() {
 	apiGroup := r.Group("/api")
 
 	// Public routes (no auth required)
-	apiGroup.POST("/rooms", api.CreateRoom)
+		// Room creation - rate limited: 5 per IP per minute
+	apiGroup.POST("/rooms", middleware.RateLimitRoom(), api.CreateRoom)
 	apiGroup.GET("/rooms/:room", api.GetRoom)
 
 	// Protected routes (require auth)
@@ -133,7 +135,8 @@ func main() {
 	{
 		protected.DELETE("/rooms/:room", api.DeleteRoom)
 		protected.POST("/rooms/:room/save", api.SaveRoom)
-		protected.POST("/upload/:room", api.UploadFile)
+		// File upload - rate limited: 10 uploads per room per user per minute
+		protected.POST("/upload/:room", middleware.RateLimitUpload(), api.UploadFile)
 		protected.GET("/rooms/:room/files", api.ListFiles)
 		protected.GET("/rooms/:room/files/:fileId/download", api.DownloadFile)
 		protected.DELETE("/rooms/:room/files", api.DeleteAllFiles)
