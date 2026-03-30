@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import api from "../utils/api";
 import axios from "axios";
 import * as Y from "yjs";
 import {
@@ -15,6 +16,7 @@ import {
   Download,
   FolderX,
   FileMinus,
+  Loader2,
 } from "lucide-react";
 import { ConfirmationModal } from "../components/ConfirmationModal";
 
@@ -51,6 +53,32 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
   const [files, setFiles] = useState<FileData[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [activeUploads, setActiveUploads] = useState<ActiveUpload[]>([]);
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+
+  // Download file with authentication
+  const handleDownload = async (file: FileData) => {
+    setDownloadingFileId(file.id);
+    try {
+      const response = await api.get(`/api/rooms/${roomSlug}/files/${file.id}/download`, {
+        responseType: 'blob',
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', file.name);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Download failed:', e);
+      alert('Failed to download file');
+    } finally {
+      setDownloadingFileId(null);
+    }
+  };
 
   useEffect(() => {
     fetchFiles();
@@ -66,11 +94,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
 
   const fetchFiles = async () => {
     try {
-      const res = await axios.get(
-        `${
-          import.meta.env.VITE_API_URL || "http://localhost:8080"
-        }/api/rooms/${roomSlug}/files`,
-      );
+      const res = await api.get(`/api/rooms/${roomSlug}/files`);
       setFiles(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       console.error(e);
@@ -81,14 +105,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
   const handleDeleteFile = async (fileId: string) => {
     if (!confirm("Delete this file?")) return;
     try {
-      await axios.delete(
-        `${
-          import.meta.env.VITE_API_URL || "http://localhost:8080"
-        }/api/rooms/${roomSlug}/files/${fileId}`,
-        {
-          headers: { "X-User-ID": userId },
-        },
-      );
+      await api.delete(`/api/rooms/${roomSlug}/files/${fileId}`);
 
       const yMeta = ydoc.getMap("meta");
       yMeta.set("lastUpload", Date.now());
@@ -115,13 +132,9 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
 
   const confirmDeleteAll = async () => {
     try {
-      const url = `${
-        import.meta.env.VITE_API_URL || "http://localhost:8080"
-      }/api/rooms/${roomSlug}/files${deleteScope === "me" ? "?user=me" : ""}`;
+      const url = `/api/rooms/${roomSlug}/files${deleteScope === "me" ? "?user=me" : ""}`;
 
-      await axios.delete(url, {
-        headers: { "X-User-ID": userId },
-      });
+      await api.delete(url);
 
       const yMeta = ydoc.getMap("meta");
       yMeta.set("lastUpload", Date.now());
@@ -181,14 +194,9 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
     let lastTime = Date.now();
 
     try {
-      const apiUrl = `${
-        import.meta.env.VITE_API_URL || "http://localhost:8080"
-      }/api/upload/${roomSlug}`;
-
-      const res = await axios.post(apiUrl, formData, {
+      const res = await api.post(`/api/upload/${roomSlug}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
-          "X-User-ID": userId,
         },
         timeout: 10 * 60 * 1000, // 10 minutes timeout for large files
         signal: controller.signal,
@@ -439,16 +447,14 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
               <div key={f.id} className="file-item-glass">
                 <div className="file-icon">{getFileIcon(f.name)}</div>
                 <div className="file-info">
-                  <a
-                    href={`${
-                      import.meta.env.VITE_API_URL || "http://localhost:8080"
-                    }/api/rooms/${roomSlug}/files/${f.id}/download`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={() => handleDownload(f)}
+                    className="file-name-link"
                     title={f.name}
+                    disabled={downloadingFileId === f.id}
                   >
                     {f.name}
-                  </a>
+                  </button>
                   <span className="file-meta">
                     {(f.size / 1024 / 1024).toFixed(2)} MB
                   </span>
@@ -457,16 +463,18 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
                   className="file-actions"
                   style={{ display: "flex", gap: "4px" }}
                 >
-                  <a
-                    href={`${
-                      import.meta.env.VITE_API_URL || "http://localhost:8080"
-                    }/api/rooms/${roomSlug}/files/${f.id}/download`}
+                  <button
+                    onClick={() => handleDownload(f)}
                     className="btn-icon"
                     title="Download"
-                    download
+                    disabled={downloadingFileId === f.id}
                   >
-                    <Download size={14} />
-                  </a>
+                    {downloadingFileId === f.id ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Download size={14} />
+                    )}
+                  </button>
                   {canDelete && (
                     <button
                       onClick={() => handleDeleteFile(f.id)}
