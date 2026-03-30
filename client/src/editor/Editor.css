@@ -519,47 +519,30 @@
   flex-shrink: 0;
   align-items: center;
   gap: 12px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.12); /* Increased visible border */
-  border-radius: 14px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 8px 12px;
   position: relative;
-  overflow: hidden; /* For any internal overflow */
-  cursor: default;
 }
 
 .file-item-glass:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.25); /* Stronger hover border */
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: transparent;
 }
 
 .file-icon {
-  color: var(--accent-color);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  /* Removed background as requested */
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
 }
 
 .file-info {
   flex: 1;
-  min-width: 0; /* Enable text truncation */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-right: 0; /* meaningful start */
-  transition: padding-right 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Force text truncation when actions appear */
-.file-item-glass:hover .file-info {
-  padding-right: 70px; /* Width of actions (2 * 32px + gap) */
 }
 
 .file-info a {
@@ -573,30 +556,44 @@
   display: block;
 }
 
+.file-name-link {
+  color: var(--text-main);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+  line-height: inherit;
+}
+
+.file-name-link:hover {
+  color: var(--color-primary, #3b82f6);
+}
+
+.file-name-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .file-meta {
   font-size: 0.75rem;
   color: var(--text-dim);
 }
 
-/* Actions: Absolute positioned */
 .file-actions {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%) translateX(10px);
   display: flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
-  opacity: 0;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  pointer-events: none;
-  /* Removed background: inherit to avoid "block" look */
-}
-
-.file-item-glass:hover .file-actions {
-  opacity: 1;
-  transform: translateY(-50%) translateX(0);
-  pointer-events: auto;
+  flex-shrink: 0;
 }
 
 /* Always show actions on touch devices or if focused */

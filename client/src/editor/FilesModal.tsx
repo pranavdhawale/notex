@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -16,6 +16,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { ConfirmationModal } from "../components/ConfirmationModal";
+import api from "../utils/api";
+import "./Editor.css"; // Import shared styles for file items
 import "./FilesModal.css";
 
 interface FileData {
@@ -61,6 +63,32 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const [showDeleteConfirmation, setShowDeleteConfirmation] =
     React.useState(false);
   const [deleteScope, setDeleteScope] = React.useState<"me" | "all">("me");
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+
+  // Download file with authentication
+  const handleDownload = async (file: FileData) => {
+    setDownloadingFileId(file.id);
+    try {
+      const response = await api.get(`/api/rooms/${roomSlug}/files/${file.id}/download`, {
+        responseType: 'blob',
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', file.name);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Download failed:', e);
+      alert('Failed to download file');
+    } finally {
+      setDownloadingFileId(null);
+    }
+  };
 
   // Close modals on Escape key
   useEffect(() => {
@@ -175,46 +203,41 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                   <div key={f.id} className="file-item-glass">
                     <div className="file-icon">{getFileIcon(f.name)}</div>
                     <div className="file-info">
-                      <a
-                        href={`${
-                          import.meta.env.VITE_API_URL ||
-                          "http://localhost:8080"
-                        }/api/rooms/${roomSlug}/files/${f.id}/download`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        onClick={() => handleDownload(f)}
+                        className="file-name-link"
                         title={f.name}
+                        disabled={downloadingFileId === f.id}
                       >
                         {f.name}
-                      </a>
+                      </button>
                       <span className="file-meta">
                         {(f.size / 1024 / 1024).toFixed(2)} MB
                       </span>
                     </div>
                     <div
                       className="file-actions"
-                      style={{
-                        display: "flex",
-                        gap: "8px",
-                        alignItems: "center",
-                      }}
+                      style={{ display: "flex", gap: "4px" }}
                     >
-                      <a
-                        href={`${
-                          import.meta.env.VITE_API_URL ||
-                          "http://localhost:8080"
-                        }/api/rooms/${roomSlug}/files/${f.id}/download`}
+                      <button
+                        onClick={() => handleDownload(f)}
                         className="btn-icon"
                         title="Download"
-                        download
+                        disabled={downloadingFileId === f.id}
                       >
-                        <Download size={16} />
-                      </a>
+                        {downloadingFileId === f.id ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Download size={14} />
+                        )}
+                      </button>
                       {canDelete && (
                         <button
                           onClick={() => onDelete(f.id)}
                           className="btn-icon delete"
+                          title="Delete"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={14} />
                         </button>
                       )}
                     </div>

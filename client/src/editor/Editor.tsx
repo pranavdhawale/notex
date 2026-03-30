@@ -23,7 +23,7 @@ import { UsersSidebar } from "./UsersSidebar";
 import { FilesModal } from "./FilesModal";
 import { Toolbar } from "./Toolbar";
 import { TableContextMenu } from "./TableContextMenu";
-import axios from "axios";
+import api, { getWebSocketUrl } from "../utils/api";
 import { Users, LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cacheManager } from "../utils/SmartCacheManager";
@@ -362,7 +362,11 @@ export const Editor: React.FC<EditorProps> = ({
   const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
 
+  // Track if we're intentionally leaving (deleting room) to prevent false 404 errors
+  const isLeavingRef = useRef(false);
+
   const handleLeave = () => {
+    isLeavingRef.current = true;
     navigate("/");
   };
 
@@ -372,12 +376,9 @@ export const Editor: React.FC<EditorProps> = ({
         "Are you sure you want to delete this room? ALL DATA WILL BE LOST.",
       )
     ) {
+      isLeavingRef.current = true; // Prevent false 404 error on disconnect
       try {
-        await axios.delete(
-          `${
-            import.meta.env.VITE_API_URL || "http://localhost:8080"
-          }/api/rooms/${roomSlug}`,
-        );
+        await api.delete(`/api/rooms/${roomSlug}`);
 
         // Clear cache for this room
         cacheManager.remove(roomSlug);
@@ -385,6 +386,7 @@ export const Editor: React.FC<EditorProps> = ({
 
         navigate("/");
       } catch (e) {
+        isLeavingRef.current = false; // Reset on error
         alert("Failed to delete room");
       }
     }
@@ -404,13 +406,9 @@ export const Editor: React.FC<EditorProps> = ({
     let lastTime = Date.now();
 
     try {
-      const apiUrl = `${
-        import.meta.env.VITE_API_URL || "http://localhost:8080"
-      }/api/upload/${roomSlug}`;
-      const res = await axios.post(apiUrl, formData, {
+      const res = await api.post(`/api/upload/${roomSlug}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
-          "X-User-ID": userId,
         },
         timeout: 10 * 60 * 1000,
         onUploadProgress: (progressEvent) => {
@@ -454,14 +452,7 @@ export const Editor: React.FC<EditorProps> = ({
   const handleFileDelete = async (fileId: string) => {
     if (!confirm("Delete this file?")) return;
     try {
-      await axios.delete(
-        `${
-          import.meta.env.VITE_API_URL || "http://localhost:8080"
-        }/api/rooms/${roomSlug}/files/${fileId}`,
-        {
-          headers: { "X-User-ID": userId },
-        },
-      );
+      await api.delete(`/api/rooms/${roomSlug}/files/${fileId}`);
 
       if (ydoc) {
         const yMeta = ydoc.getMap("meta");
@@ -476,13 +467,9 @@ export const Editor: React.FC<EditorProps> = ({
 
   const handleDeleteAll = async (scope: "me" | "all") => {
     try {
-      const url = `${
-        import.meta.env.VITE_API_URL || "http://localhost:8080"
-      }/api/rooms/${roomSlug}/files${scope === "me" ? "?user=me" : ""}`;
+      const url = `/api/rooms/${roomSlug}/files${scope === "me" ? "?user=me" : ""}`;
 
-      await axios.delete(url, {
-        headers: { "X-User-ID": userId },
-      });
+      await api.delete(url);
 
       if (ydoc) {
         const yMeta = ydoc.getMap("meta");
@@ -524,11 +511,7 @@ export const Editor: React.FC<EditorProps> = ({
     const fetchFiles = async () => {
       if (!ydoc) return;
       try {
-        const res = await axios.get(
-          `${
-            import.meta.env.VITE_API_URL || "http://localhost:8080"
-          }/api/rooms/${roomSlug}/files`,
-        );
+        const res = await api.get(`/api/rooms/${roomSlug}/files`);
         setFiles(Array.isArray(res.data) ? res.data : []);
       } catch (e) {
         console.error(e);
@@ -551,6 +534,8 @@ export const Editor: React.FC<EditorProps> = ({
 
   // Initial Load from SmartCache OR Server
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchRoomData = async () => {
       if (!ydoc) return;
 
@@ -572,11 +557,9 @@ export const Editor: React.FC<EditorProps> = ({
 
       // 2. Fetch from Server (Snapshot) if no local data
       try {
-        const res = await axios.get(
-          `${
-            import.meta.env.VITE_API_URL || "http://localhost:8080"
-          }/api/rooms/${roomSlug}`,
-        );
+        const res = await api.get(`/api/rooms/${roomSlug}`, {
+          signal: controller.signal,
+        });
 
         if (res.data.content && ydoc) {
           try {
@@ -593,6 +576,10 @@ export const Editor: React.FC<EditorProps> = ({
           }
         }
       } catch (e: any) {
+        // Ignore cancellation errors
+        if (e.name === 'CanceledError' || e.code === 'ERR_CANCELED') {
+          return;
+        }
         if (e.response && e.response.status === 404) {
           setNotFound(true);
           return;
@@ -604,19 +591,19 @@ export const Editor: React.FC<EditorProps> = ({
     if (ydoc) {
       fetchRoomData();
     }
+
+    return () => controller.abort();
   }, [roomSlug, ydoc]);
 
   useEffect(() => {
-    if (status === "disconnected") {
+    // Only check room if we're disconnected and not intentionally leaving
+    if (status === "disconnected" && !notFound && !isLeavingRef.current) {
       // Verify if room still exists
       const checkRoom = async () => {
         try {
-          await axios.get(
-            `${
-              import.meta.env.VITE_API_URL || "http://localhost:8080"
-            }/api/rooms/${roomSlug}`,
-          );
+          await api.get(`/api/rooms/${roomSlug}`);
         } catch (e: any) {
+          if (isLeavingRef.current) return; // We're leaving, ignore errors
           if (e.response && e.response.status === 404) {
             setNotFound(true);
           }
@@ -624,7 +611,7 @@ export const Editor: React.FC<EditorProps> = ({
       };
       checkRoom();
     }
-  }, [status, roomSlug]);
+  }, [status, roomSlug, notFound]);
 
   useEffect(() => {
     let provider: WebsocketProvider | null = null;
@@ -634,15 +621,9 @@ export const Editor: React.FC<EditorProps> = ({
       doc = new Y.Doc();
       setYdoc(doc);
 
-      const wsUrl =
-        (import.meta.env.VITE_API_URL || "http://localhost:8080").replace(
-          "http",
-          "ws",
-        ) + "/ws";
+      const wsUrl = getWebSocketUrl(roomSlug);
 
-      provider = new WebsocketProvider(wsUrl, roomSlug, doc, {
-        params: { room: roomSlug },
-      });
+      provider = new WebsocketProvider(wsUrl, roomSlug, doc);
 
       provider.on("status", (event: any) => {
         setStatus(event.status);
@@ -681,14 +662,9 @@ export const Editor: React.FC<EditorProps> = ({
       const reader = new FileReader();
       reader.onload = async () => {
         const base64 = (reader.result as string).split(",")[1];
-        await axios.post(
-          `${
-            import.meta.env.VITE_API_URL || "http://localhost:8080"
-          }/api/rooms/${roomSlug}/save`,
-          {
-            content: base64,
-          },
-        );
+        await api.post(`/api/rooms/${roomSlug}/save`, {
+          content: base64,
+        });
         if (!silent) alert("Saved!");
       };
       reader.readAsDataURL(blob);

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
 import { Editor } from "./editor/Editor";
 import { LandingPage } from "./LandingPage";
-import axios from "axios";
+import { getOrCreateSession, getSession } from "./utils/session";
 import "./App.css";
 
 const EditorRoute = () => {
@@ -13,28 +13,19 @@ const EditorRoute = () => {
   const [tempName, setTempName] = useState("");
   const [isOwner, setIsOwner] = useState(false);
 
-  // Ensure user ID exists
-  useEffect(() => {
-    if (!localStorage.getItem("notex_user_id")) {
-      localStorage.setItem(
-        "notex_user_id",
-        "user_" + Math.random().toString(36).substr(2, 9),
-      );
-    }
-  }, []);
-
   // Verify ownership by fetching room details
   useEffect(() => {
     if (roomSlug) {
-      axios
-        .get(
-          `${
-            import.meta.env.VITE_API_URL || "http://localhost:8080"
-          }/api/rooms/${roomSlug}`,
-        )
-        .then((res) => {
-          const currentUserId = localStorage.getItem("notex_user_id");
-          if (res.data.owner === currentUserId) {
+      // Use fetch since we need to check room details without auth
+      fetch(
+        `${
+          import.meta.env.VITE_API_URL || "http://localhost:8080"
+        }/api/rooms/${roomSlug}`,
+      )
+        .then((res) => res.json())
+        .then((data) => {
+          const session = getSession();
+          if (data.owner && session && data.owner === session.userID) {
             setIsOwner(true);
           }
         })
@@ -119,7 +110,8 @@ const EditorRoute = () => {
 
   if (!roomSlug) return <div>Invalid Room</div>;
 
-  if (!roomSlug) return <div>Invalid Room</div>;
+  // Get user ID from session
+  const userId = getUserID() || "";
 
   // Render Editor directly without app-header wrapper
   return (
@@ -127,7 +119,7 @@ const EditorRoute = () => {
       <Editor
         roomSlug={roomSlug}
         username={username}
-        userId={localStorage.getItem("notex_user_id") || ""}
+        userId={userId}
         isOwner={isOwner}
       />
     </div>
@@ -136,6 +128,7 @@ const EditorRoute = () => {
 
 import { ThemeProvider } from "./components/ThemeContext";
 import Particles from "./components/Particles";
+import { getUserID } from "./utils/session";
 
 const GlobalParticles = () => {
   const particleColor = "#ffffff"; // White particles for dark mode
@@ -157,6 +150,54 @@ const GlobalParticles = () => {
 };
 
 function App() {
+  const [sessionReady, setSessionReady] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Initialize session on app load
+    getOrCreateSession()
+      .then(() => setSessionReady(true))
+      .catch((err) => {
+        console.error('Session initialization failed:', err);
+        setSessionError(err.message);
+        setSessionReady(true); // Continue anyway for graceful degradation
+      });
+  }, []);
+
+  if (sessionError && !sessionReady) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        color: 'var(--text-main)',
+        textAlign: 'center',
+        padding: '20px'
+      }}>
+        <div>
+          <h2>Connection Error</h2>
+          <p>{sessionError}</p>
+          <button onClick={() => window.location.reload()}>Retry</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sessionReady) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        color: 'var(--text-main)'
+      }}>
+        <p>Initializing...</p>
+      </div>
+    );
+  }
+
   return (
     <ThemeProvider>
       <GlobalParticles />

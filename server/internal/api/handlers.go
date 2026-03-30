@@ -140,14 +140,32 @@ func GetRoom(c *gin.Context) {
 
 func DeleteRoom(c *gin.Context) {
 	slug := c.Param("room")
+	requestorID := c.GetString("userID")
 
 	collection := state.MongoDatabase.Collection("rooms")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// First check if room exists and user is owner
+	var room models.Room
+	err := collection.FindOne(ctx, bson.M{"slug": slug}).Decode(&room)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	// Authorization check
+	if room.Owner != requestorID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only room owner can delete this room"})
+		return
+	}
+
 	// 1. Delete Room Metadata
-	// We ignore if it wasn't found, because we want to clean up files anyway.
-	_, err := collection.DeleteOne(ctx, bson.M{"slug": slug})
+	_, err = collection.DeleteOne(ctx, bson.M{"slug": slug})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return

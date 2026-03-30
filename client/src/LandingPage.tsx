@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "./utils/api";
+import { getSession, getUserID } from "./utils/session";
 import { useNavigate } from "react-router-dom";
 import { StartupAnimation } from "./components/StartupAnimation";
 
@@ -28,17 +29,12 @@ export const LandingPage: React.FC = () => {
     // sessionStorage.setItem("notex_intro_seen", "true");
   };
 
-  // Ensure unique User ID exists
+  // Get user ID from session (already initialized in App.tsx)
   const getUserId = () => {
-    let id = localStorage.getItem("notex_user_id");
-    if (!id) {
-      id =
-        "user_" +
-        Math.random().toString(36).substr(2, 9) +
-        Date.now().toString(36);
-      localStorage.setItem("notex_user_id", id);
-    }
-    return id;
+    const session = getSession();
+    if (session) return session.userID;
+    // Fallback to legacy storage
+    return getUserID() || "";
   };
 
   const saveUsername = () => {
@@ -75,10 +71,7 @@ export const LandingPage: React.FC = () => {
         payload.customSlug = customSlug.trim().toLowerCase();
       }
 
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8080"}/api/rooms`,
-        payload,
-      );
+      const res = await api.post("/api/rooms", payload);
       const room = res.data;
       navigate(`/${room.slug}`);
     } catch (err: any) {
