@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +17,27 @@ import (
 )
 
 const MaxFileSize = 200 * 1024 * 1024 // 200MB
+const MaxFilenameLength = 50          // Maximum filename length
+
+// sanitizeFilename removes dangerous characters from filename for safe header usage
+func sanitizeFilename(name string) string {
+	// Remove control characters, quotes, backslashes, and newlines
+	name = strings.Map(func(r rune) rune {
+		if r < 32 || r == '"' || r == '\\' || r == '\r' || r == '\n' {
+			return '_'
+		}
+		return r
+	}, name)
+
+	// Limit length
+	if len(name) > MaxFilenameLength {
+		ext := filepath.Ext(name)
+		base := name[:MaxFilenameLength-len(ext)]
+		name = base + ext
+	}
+
+	return name
+}
 
 func UploadFile(c *gin.Context) {
 	roomID := c.Param("room")
@@ -28,6 +50,19 @@ func UploadFile(c *gin.Context) {
 
 	if file.Size > MaxFileSize {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "File exceeds 200MB limit"})
+		return
+	}
+
+	// Validate filename length
+	if len(file.Filename) > MaxFilenameLength {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Filename too long. Maximum %d characters.", MaxFilenameLength),
+		})
+		return
+	}
+
+	if file.Filename == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Filename cannot be empty"})
 		return
 	}
 
@@ -145,7 +180,7 @@ func DownloadFile(c *gin.Context) {
 	c.Header("Content-Type", "application/octet-stream")
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("X-Frame-Options", "DENY")
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", file.Name))
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", sanitizeFilename(file.Name)))
 	c.Header("Cache-Control", "private, max-age=3600")
 
 	// Stream to client
