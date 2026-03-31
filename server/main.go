@@ -75,6 +75,16 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
+
+		// Security Headers
+		r.Use(func(c *gin.Context) {
+			c.Header("X-Content-Type-Options", "nosniff")
+			c.Header("X-Frame-Options", "DENY")
+			c.Header("X-XSS-Protection", "1; mode=block")
+			c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none';")
+			c.Next()
+		})
+
 	// Health Check
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
