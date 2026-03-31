@@ -246,9 +246,9 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
     } catch (err: any) {
       if (axios.isCancel(err)) {
         console.log("Upload cancelled");
-      } else if (err.response?.status === 429) {
+      } else if (err.response?.data?.error) {
         // Rate limit error - show server message
-        alert(err.response.data?.error || "Too many uploads. Please wait a minute and try again.");
+        alert(err.response.data.error);
       } else {
         alert(`Upload failed for ${file.name}. Max 200MB.`);
       }

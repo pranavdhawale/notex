@@ -441,9 +441,9 @@ export const Editor: React.FC<EditorProps> = ({
 
       setFiles((prev) => [...prev, newFile]);
     } catch (err: any) {
-      if (err.response?.status === 429) {
-        // Rate limit error - show server message
-        alert(err.response.data?.error || "Too many uploads. Please wait a minute and try again.");
+      if (err.response?.data?.error) {
+        // Server returned an error message - show it
+        alert(err.response.data.error);
       } else {
         alert("Upload failed. Max 200MB.");
       }
