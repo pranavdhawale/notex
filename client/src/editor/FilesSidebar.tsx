@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import api from "../utils/api";
 import axios from "axios";
@@ -80,6 +80,16 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
     }
   };
 
+  const fetchFiles = useCallback(async () => {
+    try {
+      const res = await api.get(`/api/rooms/${roomSlug}/files`);
+      setFiles(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.error(e);
+      setFiles([]);
+    }
+  }, [roomSlug]);
+
   useEffect(() => {
     fetchFiles();
 
@@ -90,17 +100,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
     };
     yMeta.observe(observer);
     return () => yMeta.unobserve(observer);
-  }, [roomSlug, ydoc]);
-
-  const fetchFiles = async () => {
-    try {
-      const res = await api.get(`/api/rooms/${roomSlug}/files`);
-      setFiles(Array.isArray(res.data) ? res.data : []);
-    } catch (e) {
-      console.error(e);
-      setFiles([]);
-    }
-  };
+  }, [ydoc, fetchFiles]);
 
   const handleDeleteFile = async (fileId: string) => {
     if (!confirm("Delete this file?")) return;
