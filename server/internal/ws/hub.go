@@ -135,7 +135,8 @@ func (h *Hub) Run() {
 					select {
 					case client.send <- message.Content:
 					default:
-						// If send buffer is full, close channel and assume client is dead
+						// Client buffer full, message dropped (client may be slow/disconnected)
+						log.Printf("Client buffer full in room %s, dropping message", message.RoomID)
 					}
 				}
 			}
