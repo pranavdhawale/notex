@@ -78,9 +78,8 @@ export async function getOrCreateSession(): Promise<SessionData> {
 
       if (response.ok) {
         const data: SessionResponse = await response.json();
-        if (!data.isNew) {
-          return existingSession;
-        }
+        // Always use server response - server knows best
+        return setSession(data.token, data.userID);
       }
     } catch (error) {
       console.error('Failed to verify session:', error);
