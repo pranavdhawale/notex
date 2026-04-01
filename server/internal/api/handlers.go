@@ -132,7 +132,10 @@ func GetRoom(c *gin.Context) {
 	go func(s string, t time.Time) {
 		bgCtx, bgCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer bgCancel()
-		_, _ = collection.UpdateOne(bgCtx, bson.M{"slug": s}, bson.M{"$set": bson.M{"expire_at": t}})
+		_, err := collection.UpdateOne(bgCtx, bson.M{"slug": s}, bson.M{"$set": bson.M{"expire_at": t}})
+		if err != nil {
+			log.Printf("Failed to update room expiry for %s: %v", s, err)
+		}
 	}(slug, newExpiry)
 
 	c.JSON(http.StatusOK, room)
