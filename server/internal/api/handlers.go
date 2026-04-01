@@ -115,18 +115,8 @@ func GetRoom(c *gin.Context) {
 	}
 
 	// Refresh Expiration (Smart TTL)
-	hasContent := false
-	if room.Content != nil {
-		// Check if content is empty string if it's a string, or just nil check
-		// Currently Content is interface{}, usually string(base64) or map
-		// Let's assume non-nil means content for now, or check empty string
-		if s, ok := room.Content.(string); ok && s != "" {
-			hasContent = true
-		} else if room.Content != nil {
-			hasContent = true // Non-string content
-		}
-	}
-	
+	hasContent := room.Content != nil
+
 	newExpiry := calculateExpiry(hasContent)
 	// Update ExpireAt in background (don't block read)
 	go func(s string, t time.Time) {
