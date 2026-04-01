@@ -78,9 +78,8 @@ export async function getOrCreateSession(): Promise<SessionData> {
 
       if (response.ok) {
         const data: SessionResponse = await response.json();
-        if (!data.isNew) {
-          return existingSession;
-        }
+        // Always use server response - server knows best
+        return setSession(data.token, data.userID);
       }
     } catch (error) {
       console.error('Failed to verify session:', error);
@@ -102,7 +101,7 @@ export async function getOrCreateSession(): Promise<SessionData> {
   } catch (error) {
     console.error('Failed to create session:', error);
     // Fallback: generate local-only session (won't be authenticated)
-    const fallbackUserID = 'user_' + Math.random().toString(36).substr(2, 12);
+    const fallbackUserID = 'user_' + crypto.randomUUID().split('-')[0];
     localStorage.setItem(USER_ID_KEY, fallbackUserID);
     throw new Error('Unable to establish session. Please check your connection.');
   }

@@ -50,13 +50,6 @@ func main() {
 		log.Fatalf("Failed to ensure MinIO bucket: %v", err)
 	}
 
-	//redisAddr := os.Getenv("REDIS_ADDR")
-	//if redisAddr == "" {
-	//	redisAddr = "localhost:6379"
-	//}
-	//redisPassword := os.Getenv("REDIS_PASSWORD")
-	//state.InitRedis(redisAddr, redisPassword)
-
 	r := gin.Default()
 
 	// CORS Configuration
@@ -169,8 +162,8 @@ func main() {
 	srv := &http.Server{
 		Addr:           ":" + port,
 		Handler:        r,
-		ReadTimeout:    10 * time.Minute, // Allow large file uploads
-		WriteTimeout:   10 * time.Minute,
+		ReadTimeout:    5 * time.Minute,
+		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
 

@@ -76,7 +76,7 @@ const TiptapEditor: React.FC<{
   handleSave,
   initialContent,
 }) => {
-  const [debouncer, setDebouncer] = useState<ReturnType<typeof setTimeout>>();
+  const debouncerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [menuState, setMenuState] = useState({ isOpen: false, x: 0, y: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -115,21 +115,20 @@ const TiptapEditor: React.FC<{
     content: initialContent,
     onUpdate: ({ editor }) => {
       // Debounced save to SessionStorage (JSON content)
-      if (debouncer) clearTimeout(debouncer);
-      const timer = setTimeout(() => {
+      if (debouncerRef.current) clearTimeout(debouncerRef.current);
+      debouncerRef.current = setTimeout(() => {
         const json = JSON.stringify(editor.getJSON());
         cacheManager.save(roomSlug, json);
       }, 2000);
-      setDebouncer(timer);
     },
   });
 
-  // Cleanup debouncer
+  // Cleanup debouncer on unmount
   useEffect(() => {
     return () => {
-      if (debouncer) clearTimeout(debouncer);
+      if (debouncerRef.current) clearTimeout(debouncerRef.current);
     };
-  }, [debouncer]);
+  }, []);
 
   // Auto-hide scrollbar + track scroll position
   useEffect(() => {
@@ -382,7 +381,6 @@ export const Editor: React.FC<EditorProps> = ({
 
         // Clear cache for this room
         cacheManager.remove(roomSlug);
-        console.log("🗑️ Cleared cache for deleted room");
 
         navigate("/");
       } catch (e) {

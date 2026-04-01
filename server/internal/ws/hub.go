@@ -43,7 +43,6 @@ func NewHub() *Hub {
 
 func (h *Hub) CloseRoom(roomID string) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 
 	if clients, ok := h.rooms[roomID]; ok {
 		for client := range clients {
@@ -52,7 +51,10 @@ func (h *Hub) CloseRoom(roomID string) {
 		}
 		delete(h.rooms, roomID)
 		delete(h.awareness, roomID)
+		h.mu.Unlock()
 		log.Printf("Room closed: %s", roomID)
+	} else {
+		h.mu.Unlock()
 	}
 }
 
@@ -66,7 +68,6 @@ func (h *Hub) Run() {
 				h.awareness[client.roomID] = make(map[*Client][]byte)
 			}
 			h.rooms[client.roomID][client] = true
-			log.Printf("Client registered to room: %s", client.roomID)
 
 			// Send existing awareness states to the new client
 			if states, ok := h.awareness[client.roomID]; ok {
@@ -74,14 +75,16 @@ func (h *Hub) Run() {
 					select {
 					case client.send <- state:
 					default:
-						log.Printf("WARN: Failed to send cached awareness to client (buffer full)")
+						// Buffer full, skip this state
 					}
 				}
 			}
 			h.mu.Unlock()
+			log.Printf("Client registered to room: %s", client.roomID)
 
 		case client := <-h.unregister:
 			h.mu.Lock()
+			var roomIsEmpty bool
 			if _, ok := h.rooms[client.roomID]; ok {
 				if _, ok := h.rooms[client.roomID][client]; ok {
 					delete(h.rooms[client.roomID], client)
@@ -92,15 +95,16 @@ func (h *Hub) Run() {
 					}
 
 					close(client.send)
-					log.Printf("Client unregistered from room: %s", client.roomID)
 					// Cleanup room if empty
-					if len(h.rooms[client.roomID]) == 0 {
+					roomIsEmpty = len(h.rooms[client.roomID]) == 0
+					if roomIsEmpty {
 						delete(h.rooms, client.roomID)
 						delete(h.awareness, client.roomID)
 					}
 				}
 			}
 			h.mu.Unlock()
+			log.Printf("Client unregistered from room: %s", client.roomID)
 
 		case message := <-h.broadcast:
 			h.mu.Lock() // Use Write Lock for map updates
@@ -131,7 +135,8 @@ func (h *Hub) Run() {
 					select {
 					case client.send <- message.Content:
 					default:
-						// If send buffer is full, close channel and assume client is dead
+						// Client buffer full, message dropped (client may be slow/disconnected)
+						log.Printf("Client buffer full in room %s, dropping message", message.RoomID)
 					}
 				}
 			}

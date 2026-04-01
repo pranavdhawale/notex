@@ -134,14 +134,13 @@ func generateRandomString(length int) string {
 	randomBytes := make([]byte, length)
 
 	// Use crypto/rand for cryptographically secure randomness
+	// If this fails, it indicates a serious system problem - we must not silently
+	// fall back to weak randomness for security-sensitive identifiers.
 	if _, err := rand.Read(randomBytes); err != nil {
-		// This should never happen with crypto/rand on supported platforms
-		// Fall back to current timestamp (not ideal, but better than crashing)
-		log.Printf("WARNING: crypto/rand failed: %v, falling back to timestamp", err)
-		for i := range b {
-			b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
-		}
-		return string(b)
+		log.Printf("ERROR: crypto/rand failed: %v", err)
+		// In development, panic with a clear message; in production, log and panic
+		// A working crypto/rand is essential for secure session tokens
+		panic("crypto/rand is not available - cannot generate secure random values")
 	}
 
 	for i := range b {

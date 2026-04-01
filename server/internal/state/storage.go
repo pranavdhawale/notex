@@ -18,13 +18,21 @@ func InitMinIO() {
 	}
 
 	accessKey := os.Getenv("MINIO_ACCESS_KEY")
-	if accessKey == "" {
-		accessKey = "minioadmin"
-	}
-
 	secretKey := os.Getenv("MINIO_SECRET_KEY")
-	if secretKey == "" {
-		secretKey = "minioadmin123"
+
+	// In production, credentials must be explicitly configured
+	if os.Getenv("GIN_MODE") == "release" {
+		if accessKey == "" || secretKey == "" {
+			log.Fatal("MINIO_ACCESS_KEY and MINIO_SECRET_KEY must be set in production mode")
+		}
+	} else {
+		// Development defaults only
+		if accessKey == "" {
+			accessKey = "minioadmin"
+		}
+		if secretKey == "" {
+			secretKey = "minioadmin123"
+		}
 	}
 
 	useSSL := os.Getenv("MINIO_USE_SSL") == "true"

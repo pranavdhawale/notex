@@ -3,19 +3,13 @@ package utils
 import (
 	"context"
 	"errors"
-	"math/rand"
 	"regexp"
 	"strings"
-	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 // GenerateSlug generates a human-friendly 2-word slug
 // Uses adjective-noun or color-animal patterns
