@@ -110,7 +110,9 @@ func UploadFile(c *gin.Context) {
 	_, err = collection.InsertOne(ctx2, fileRecord)
 	if err != nil {
 		// Try to cleanup MinIO on database failure
-		state.MinIOClient.Delete(context.Background(), storageKey)
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		state.MinIOClient.Delete(cleanupCtx, storageKey)
+		cleanupCancel()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
