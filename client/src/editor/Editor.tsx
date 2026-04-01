@@ -381,7 +381,6 @@ export const Editor: React.FC<EditorProps> = ({
 
         // Clear cache for this room
         cacheManager.remove(roomSlug);
-        console.log("🗑️ Cleared cache for deleted room");
 
         navigate("/");
       } catch (e) {
