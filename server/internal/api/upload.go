@@ -14,6 +14,7 @@ import (
 	"github.com/pranavdhawale/notex/server/internal/models"
 	"github.com/pranavdhawale/notex/server/internal/state"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const MaxFileSize = 200 * 1024 * 1024 // 200MB
@@ -282,26 +283,37 @@ func DeleteAllFiles(c *gin.Context) {
 		}
 	}
 
-	// Find files to delete
-	cursor, err := collection.Find(ctx, filter)
+	// Find files to delete - project only storage_key to minimize memory
+	opts := options.Find().SetProjection(bson.M{"storage_key": 1})
+	cursor, err := collection.Find(ctx, filter, opts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
 	defer cursor.Close(ctx)
 
-	var files []models.File
-	if err = cursor.All(ctx, &files); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode files"})
+	// Collect storage keys for MinIO deletion
+	var storageKeys []string
+	for cursor.Next(ctx) {
+		var file models.File
+		if err := cursor.Decode(&file); err != nil {
+			log.Printf("Error: failed to decode file document for deletion: %v", err)
+			continue
+		}
+		storageKeys = append(storageKeys, file.StorageKey)
+	}
+
+	if err := cursor.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error during file scan"})
 		return
 	}
 
-	if len(files) == 0 {
+	if len(storageKeys) == 0 {
 		c.JSON(http.StatusOK, gin.H{"message": "No files to delete", "count": 0})
 		return
 	}
 
-	// Delete from DB
+	// Delete from DB (single operation)
 	_, err = collection.DeleteMany(ctx, filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete from database"})
@@ -313,11 +325,11 @@ func DeleteAllFiles(c *gin.Context) {
 	defer cancel2()
 
 	deletedCount := 0
-	for _, f := range files {
-		if err := state.MinIOClient.Delete(ctx2, f.StorageKey); err == nil {
+	for _, key := range storageKeys {
+		if err := state.MinIOClient.Delete(ctx2, key); err == nil {
 			deletedCount++
 		} else {
-			log.Printf("Warning: failed to delete %s from MinIO: %v", f.StorageKey, err)
+			log.Printf("Warning: failed to delete %s from MinIO: %v", key, err)
 		}
 	}
 
