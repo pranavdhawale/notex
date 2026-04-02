@@ -75,7 +75,8 @@ Notex isn't just a toy; it's an architectural showcase.
 - **Go (Golang) 1.23+**: Raw performance and first-class concurrency
 - **Gin**: High-performance HTTP web framework
 - **WebSocket**: Native Go WebSocket for real-time communication
-- **MongoDB**: Stores room metadata, content, and files
+- **MongoDB**: Stores room metadata, content, and application state
+- **MinIO**: S3-compatible object storage for secure, scalable file handling
 - **golang-petname**: Human-friendly slug generation
 
 ### **Infrastructure** 🏗️
@@ -114,7 +115,7 @@ graph TD
     Client <-->|WebSocket| Server
 
     Server -->|Metadata & Content| Mongo[(🍃 MongoDB)]
-    Server -->|File Storage| FS[📂 Local Filesystem]
+    Server -->|File Storage| MinIO[(🪣 MinIO Object Storage)]
 
     Client -->|Yjs CRDT| YjsDoc[📄 Y.Doc]
     YjsDoc -->|Sync| Server
@@ -124,8 +125,9 @@ graph TD
 ### Key Components
 
 - **Client**: React SPA with Tiptap editor and Yjs integration
-- **Server**: Go API server with WebSocket hub for real-time sync
+- **Server**: Go API server with WebSocket hub, secured by centralized rate limiters and auth middleware
 - **MongoDB**: Persistent storage for rooms, content, and metadata
+- **MinIO**: S3-compatible service for robust, scalable object & file storage
 - **WebSocket Hub**: Manages active connections and broadcasts updates
 - **Smart Cache**: Browser-based caching for resilience
 
@@ -148,11 +150,13 @@ notex/
 ├── server/                # Go backend
 │   ├── main.go
 │   ├── internal/
-│   │   ├── api/          # HTTP handlers
+│   │   ├── api/          # Protected HTTP handlers
+│   │   ├── middleware/   # Security layer (Auth & Rate limits)
+│   │   ├── storage/      # MinIO client and file handling
 │   │   ├── ws/           # WebSocket hub & clients
 │   │   ├── models/       # Data models
-│   │   ├── state/        # MongoDB connection
-│   │   └── utils/        # Utilities (slug generator)
+│   │   ├── state/        # DB & State connections
+│   │   └── utils/        # Utilities
 │   └── Dockerfile
 │
 └── docker-compose.dev.yml
@@ -216,7 +220,8 @@ docker-compose -f docker-compose.dev.yml logs -f client
 
 - **No Sign-Up Required**: Start collaborating immediately
 - **Ephemeral by Default**: Rooms auto-expire based on activity
-- **Local Storage**: Files stored on server filesystem
+- **Secure File Storage**: Files are safely isolated using S3-compatible object storage (MinIO)
+- **Built-in Rate Limiting**: Abuse prevention across API & file upload routes
 - **No Tracking**: We don't track user behavior
 - **Open Source**: Full transparency
 
