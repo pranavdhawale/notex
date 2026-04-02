@@ -16,6 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { ConfirmationModal } from "../components/ConfirmationModal";
+import { toast } from "../components/Toaster";
 import api from "../utils/api";
 import "./Editor.css"; // Import shared styles for file items
 import "./FilesModal.css";
@@ -84,7 +85,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
       window.URL.revokeObjectURL(url);
     } catch (e) {
       console.error('Download failed:', e);
-      alert('Failed to download file');
+      toast.error("Failed to download file");
     } finally {
       setDownloadingFileId(null);
     }

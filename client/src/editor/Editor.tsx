@@ -28,6 +28,7 @@ import { Users, LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown } from "l
 import { useNavigate } from "react-router-dom";
 import { cacheManager } from "../utils/SmartCacheManager";
 import { NotFoundView } from "../components/NotFoundView";
+import { toast } from "../components/Toaster";
 
 interface EditorProps {
   roomSlug: string;
@@ -385,7 +386,7 @@ export const Editor: React.FC<EditorProps> = ({
         navigate("/");
       } catch (e) {
         isLeavingRef.current = false; // Reset on error
-        alert("Failed to delete room");
+      toast.error("Failed to delete room");
       }
     }
   };
@@ -441,9 +442,9 @@ export const Editor: React.FC<EditorProps> = ({
     } catch (err: any) {
       if (err.response?.data?.error) {
         // Server returned an error message - show it
-        alert(err.response.data.error);
+        toast.error(err.response.data.error);
       } else {
-        alert("Upload failed. Max 200MB.");
+        toast.error("Upload failed. Max 200MB.");
       }
     } finally {
       setUploading(false);
@@ -464,7 +465,7 @@ export const Editor: React.FC<EditorProps> = ({
 
       setFiles((prev) => prev.filter((f) => f.id !== fileId));
     } catch (e) {
-      alert("Failed to delete file");
+      toast.error("Failed to delete file");
     }
   };
 
@@ -487,7 +488,7 @@ export const Editor: React.FC<EditorProps> = ({
       }
     } catch (e) {
       console.error(e);
-      alert("Failed to delete all files");
+      toast.error("Failed to delete all files");
     }
   };
 
@@ -668,12 +669,12 @@ export const Editor: React.FC<EditorProps> = ({
         await api.post(`/api/rooms/${roomSlug}/save`, {
           content: base64,
         });
-        if (!silent) alert("Saved!");
+        if (!silent) toast.success("Saved!");
       };
       reader.readAsDataURL(blob);
     } catch (e) {
       console.error(e);
-      if (!silent) alert("Failed to save");
+      if (!silent) toast.error("Failed to save");
     } finally {
       // Keep "Saving..." indicator for a moment so user sees it
       setTimeout(() => setSaving(false), 500);
