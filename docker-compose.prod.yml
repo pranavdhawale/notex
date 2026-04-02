@@ -13,8 +13,6 @@ services:
       - TZ=Asia/Kolkata
     networks:
       - internal
-    volumes:
-      - /srv/docker/volumes/notex/uploads:/app/uploads
 
   client:
     build:
