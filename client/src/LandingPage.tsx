@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import api from "./utils/api";
 import { getSession, getUserID } from "./utils/session";
+import { toast } from "./components/Toaster";
 import { useNavigate } from "react-router-dom";
 import { StartupAnimation } from "./components/StartupAnimation";
 
@@ -11,6 +12,7 @@ export const LandingPage: React.FC = () => {
   const [showAnimation, setShowAnimation] = useState(true);
   const [joinRoomCode, setJoinRoomCode] = useState("");
   const [customSlug, setCustomSlug] = useState("");
+  const [usernameError, setUsernameError] = useState(false);
   const [username, setUsername] = useState(
     localStorage.getItem("notex_username") || "",
   );
@@ -49,13 +51,13 @@ export const LandingPage: React.FC = () => {
       saveUsername();
       navigate(`/${joinRoomCode.trim()}`);
     } else if (!username.trim()) {
-      alert("Please enter your name");
+      setUsernameError(true);
     }
   };
 
   const handleCreateRoom = async () => {
     if (!username.trim()) {
-      alert("Please enter your name");
+      setUsernameError(true);
       return;
     }
     saveUsername();
@@ -77,7 +79,7 @@ export const LandingPage: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       const errorMsg = err.response?.data?.error || "Failed to create room";
-      alert(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -104,9 +106,17 @@ export const LandingPage: React.FC = () => {
               type="text"
               placeholder="Enter your name"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="glass-input"
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (e.target.value.trim()) setUsernameError(false);
+              }}
+              className={`glass-input ${usernameError ? "input-error" : ""}`}
             />
+            {usernameError && (
+              <small style={{ color: "#ff6b6b", fontSize: "0.75em", marginTop: "4px", display: "block" }}>
+                Please enter your name
+              </small>
+            )}
           </div>
 
           <div

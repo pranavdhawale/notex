@@ -19,6 +19,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { ConfirmationModal } from "../components/ConfirmationModal";
+import { toast } from "../components/Toaster";
 
 interface FilesSidebarProps {
   roomSlug: string;
@@ -74,7 +75,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       window.URL.revokeObjectURL(url);
     } catch (e) {
       console.error('Download failed:', e);
-      alert('Failed to download file');
+      toast.error("Failed to download file");
     } finally {
       setDownloadingFileId(null);
     }
@@ -112,7 +113,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
 
       setFiles((prev) => prev.filter((f) => f.id !== fileId));
     } catch (e) {
-      alert("Failed to delete file");
+      toast.error("Failed to delete file");
     }
   };
 
@@ -147,7 +148,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       }
     } catch (e) {
       console.error(e);
-      alert("Failed to delete files");
+      toast.error("Failed to delete files");
     }
   };
 
@@ -248,9 +249,9 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
         console.log("Upload cancelled");
       } else if (err.response?.data?.error) {
         // Rate limit error - show server message
-        alert(err.response.data.error);
+        toast.error(err.response.data.error);
       } else {
-        alert(`Upload failed for ${file.name}. Max 200MB.`);
+        toast.error(`Upload failed for ${file.name}. Max 200MB.`);
       }
     } finally {
       setActiveUploads((prev) => prev.filter((u) => u.id !== uploadId));

@@ -128,6 +128,7 @@ const EditorRoute = () => {
 
 import { ThemeProvider } from "./components/ThemeContext";
 import Particles from "./components/Particles";
+import { Toaster } from "./components/Toaster";
 import { getUserID } from "./utils/session";
 
 const GlobalParticles = () => {
@@ -201,6 +202,7 @@ function App() {
   return (
     <ThemeProvider>
       <GlobalParticles />
+      <Toaster />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
