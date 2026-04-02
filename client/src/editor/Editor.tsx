@@ -61,7 +61,6 @@ const TiptapEditor: React.FC<{
   handleLeave: () => void;
   handleDeleteRoom: () => void;
   handleSave: () => void;
-  initialContent: any; // Add initial content prop
 }> = ({
   provider,
   userDetails,
@@ -75,9 +74,7 @@ const TiptapEditor: React.FC<{
   handleLeave,
   handleDeleteRoom,
   handleSave,
-  initialContent,
 }) => {
-  const debouncerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [menuState, setMenuState] = useState({ isOpen: false, x: 0, y: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -113,23 +110,11 @@ const TiptapEditor: React.FC<{
       scrollThreshold: { top: 80, bottom: 40, left: 0, right: 0 },
       scrollMargin: { top: 80, bottom: 40, left: 0, right: 0 },
     },
-    content: initialContent,
-    onUpdate: ({ editor }) => {
-      // Debounced save to SessionStorage (JSON content)
-      if (debouncerRef.current) clearTimeout(debouncerRef.current);
-      debouncerRef.current = setTimeout(() => {
-        const json = JSON.stringify(editor.getJSON());
-        cacheManager.save(roomSlug, json);
-      }, 2000);
+    onUpdate: () => {
+      // Yjs state is updated automatically via Collaboration extension
+      // Caching is handled by the ydoc.on('update') listener in parent component
     },
   });
-
-  // Cleanup debouncer on unmount
-  useEffect(() => {
-    return () => {
-      if (debouncerRef.current) clearTimeout(debouncerRef.current);
-    };
-  }, []);
 
   // Auto-hide scrollbar + track scroll position
   useEffect(() => {
@@ -352,7 +337,6 @@ export const Editor: React.FC<EditorProps> = ({
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [initialContent, setInitialContent] = useState<any>(null); // State for initial content
   const [showUsers, setShowUsers] = useState(() => {
     const saved = localStorage.getItem("notex_show_users");
     return saved === null ? true : saved === "true";
@@ -510,6 +494,27 @@ export const Editor: React.FC<EditorProps> = ({
     localStorage.setItem("notex_show_users", String(showUsers));
   }, [showUsers]);
 
+  // Save Yjs state to cache on updates (debounced)
+  useEffect(() => {
+    if (!ydoc) return;
+
+    let saveTimeout: ReturnType<typeof setTimeout>;
+
+    const saveHandler = () => {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => {
+        cacheManager.saveYjs(roomSlug, ydoc);
+      }, 500); // 500ms debounce
+    };
+
+    ydoc.on('update', saveHandler);
+
+    return () => {
+      clearTimeout(saveTimeout);
+      ydoc.off('update', saveHandler);
+    };
+  }, [ydoc, roomSlug]);
+
   // Fetch files for mobile modal
   useEffect(() => {
     const fetchFiles = async () => {
@@ -536,36 +541,21 @@ export const Editor: React.FC<EditorProps> = ({
     }
   }, [roomSlug, ydoc]);
 
-  // Initial Load from SmartCache OR Server
+  // Fetch room snapshot from server (for 404 check and server merge)
   useEffect(() => {
     const controller = new AbortController();
 
-    const fetchRoomData = async () => {
+    const fetchRoomSnapshot = async () => {
       if (!ydoc) return;
 
-      // 1. Try SmartCache First (SessionStorage - JSON)
-      const cached = cacheManager.load(roomSlug);
-      if (cached) {
-        try {
-          const jsonContent = JSON.parse(cached);
-          setInitialContent(jsonContent);
-          console.log("✅ Restored from SessionStorage (JSON)");
-          // We don't return here because we still might want to fetch server snapshot if needed,
-          // OR rely on Yjs sync.
-          // For now, if we have local cache, we trust it for the *initial* view.
-          return;
-        } catch (e) {
-          console.error("Failed to parse cached content:", e);
-        }
-      }
-
-      // 2. Fetch from Server (Snapshot) if no local data
+      // Check if room exists
       try {
         const res = await api.get(`/api/rooms/${roomSlug}`, {
           signal: controller.signal,
         });
 
-        if (res.data.content && ydoc) {
+        // Apply server snapshot if it exists (Yjs will merge with local cache)
+        if (res.data.content) {
           try {
             const binaryString = window.atob(res.data.content);
             const len = binaryString.length;
@@ -574,9 +564,9 @@ export const Editor: React.FC<EditorProps> = ({
               bytes[i] = binaryString.charCodeAt(i);
             }
             Y.applyUpdate(ydoc, bytes);
-            console.log("📥 Snapshot loaded from Server");
+            console.log("📥 Server snapshot merged");
           } catch (err) {
-            console.error("Failed to load snapshot", err);
+            console.error("Failed to merge server snapshot", err);
           }
         }
       } catch (e: any) {
@@ -588,13 +578,11 @@ export const Editor: React.FC<EditorProps> = ({
           setNotFound(true);
           return;
         }
-        // Other errors (e.g. network) just fail silently for now or retry
+        // Other errors (e.g. network) just fail silently
       }
     };
 
-    if (ydoc) {
-      fetchRoomData();
-    }
+    fetchRoomSnapshot();
 
     return () => controller.abort();
   }, [roomSlug, ydoc]);
@@ -625,9 +613,22 @@ export const Editor: React.FC<EditorProps> = ({
       doc = new Y.Doc();
       setYdoc(doc);
 
-      const wsUrl = getWebSocketUrl(roomSlug);
+      // Load Yjs cache BEFORE connecting to WebSocket
+      const cachedUpdate = cacheManager.loadYjs(roomSlug);
+      if (cachedUpdate) {
+        try {
+          Y.applyUpdate(doc, cachedUpdate);
+          console.log("✅ Restored Yjs state from SessionStorage");
+        } catch (e) {
+          console.error("Failed to apply cached Yjs state:", e);
+        }
+      }
 
-      provider = new WebsocketProvider(wsUrl, roomSlug, doc);
+      // Create provider with connect: false to prevent early sync
+      const wsUrl = getWebSocketUrl(roomSlug);
+      provider = new WebsocketProvider(wsUrl, roomSlug, doc, {
+        connect: false
+      });
 
       provider.on("status", (event: any) => {
         setStatus(event.status);
@@ -638,6 +639,9 @@ export const Editor: React.FC<EditorProps> = ({
       });
 
       setProvider(provider);
+
+      // Now connect (after cache is applied)
+      provider.connect();
     };
 
     // Small delay to ensure previous cleanup is complete (fixes ghost cursors on strict mode/hot reload)
@@ -646,6 +650,14 @@ export const Editor: React.FC<EditorProps> = ({
     return () => {
       clearTimeout(timeoutId);
       if (provider) {
+        // Save Yjs state before disconnecting
+        if (doc) {
+          try {
+            cacheManager.saveYjs(roomSlug, doc);
+          } catch (e) {
+            console.error("Failed to save Yjs cache on cleanup:", e);
+          }
+        }
         provider.awareness.setLocalStateField("user", null); // Explicitly clear user
         provider.destroy();
       }
@@ -714,7 +726,6 @@ export const Editor: React.FC<EditorProps> = ({
           handleLeave={handleLeave}
           handleDeleteRoom={handleDeleteRoom}
           handleSave={() => handleSave(false)}
-          initialContent={initialContent}
         />
       </div>
 

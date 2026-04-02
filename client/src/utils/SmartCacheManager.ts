@@ -1,4 +1,5 @@
 import pako from "pako";
+import * as Y from "yjs";
 
 interface CacheEntry {
   data: string;
@@ -7,6 +8,7 @@ interface CacheEntry {
 
 export class SmartCacheManager {
   private readonly prefix = "notex_room_";
+  private readonly yjsPrefix = "notex_yjs_";
 
   /**
    * Save room data to sessionStorage with compression
@@ -70,7 +72,55 @@ export class SmartCacheManager {
    */
   remove(roomSlug: string): void {
     sessionStorage.removeItem(`${this.prefix}${roomSlug}`);
+    sessionStorage.removeItem(`${this.yjsPrefix}${roomSlug}`);
     console.log(`🗑️ Removed room from cache: ${roomSlug}`);
+  }
+
+  // ========================================
+  // Yjs State Methods (Binary format)
+  // ========================================
+
+  /**
+   * Save Yjs document state to sessionStorage
+   * Uses Y.encodeStateAsUpdate format
+   */
+  saveYjs(roomSlug: string, doc: Y.Doc): void {
+    try {
+      const update = Y.encodeStateAsUpdate(doc);
+      const base64 = btoa(String.fromCharCode(...update));
+      sessionStorage.setItem(`${this.yjsPrefix}${roomSlug}`, base64);
+    } catch (e) {
+      console.error("Failed to save Yjs cache:", e);
+    }
+  }
+
+  /**
+   * Load Yjs document state from sessionStorage
+   * Returns the update as Uint8Array, or null if not found
+   */
+  loadYjs(roomSlug: string): Uint8Array | null {
+    try {
+      const base64 = sessionStorage.getItem(`${this.yjsPrefix}${roomSlug}`);
+      if (!base64) return null;
+
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    } catch (e) {
+      console.error(`Failed to load Yjs cache for room ${roomSlug}:`, e);
+      this.removeYjs(roomSlug);
+      return null;
+    }
+  }
+
+  /**
+   * Remove Yjs cache for a room
+   */
+  removeYjs(roomSlug: string): void {
+    sessionStorage.removeItem(`${this.yjsPrefix}${roomSlug}`);
   }
 
   /**
@@ -78,7 +128,7 @@ export class SmartCacheManager {
    */
   clearAll(): void {
     Object.keys(sessionStorage).forEach((key) => {
-      if (key.startsWith(this.prefix)) {
+      if (key.startsWith(this.prefix) || key.startsWith(this.yjsPrefix)) {
         sessionStorage.removeItem(key);
       }
     });
