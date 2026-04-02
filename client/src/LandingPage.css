@@ -106,6 +106,11 @@
   box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
 }
 
+.glass-input.input-error {
+  border-color: #ff4d4f;
+  box-shadow: 0 0 0 4px rgba(255, 77, 79, 0.2);
+}
+
 .glass-input::placeholder {
   color: var(--text-dim);
   opacity: 0.5;
