@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -23,8 +22,10 @@ type CreateRoomRequest struct {
 	CustomSlug *string `json:"customSlug,omitempty"` // Optional custom slug
 }
 
-
-// Helper to calculate expiration based on content
+// calculateExpiry returns the expiration time based on whether the room has content.
+// - Empty rooms (no document content): 24 hours
+// - Rooms with content: 7 days
+// Files inherit the room's TTL and are updated when room TTL is refreshed.
 func calculateExpiry(hasContent bool) time.Time {
 	if hasContent {
 		return time.Now().Add(7 * 24 * time.Hour) // 7 Days
@@ -126,6 +127,11 @@ func GetRoom(c *gin.Context) {
 		if err != nil {
 			log.Printf("Failed to update room expiry for %s: %v", s, err)
 		}
+
+		// Also update file TTL to match room TTL
+		if err := state.UpdateFilesTTL(s, t); err != nil {
+			log.Printf("Failed to update file TTL for room %s: %v", s, err)
+		}
 	}(slug, newExpiry)
 
 	c.JSON(http.StatusOK, room)
@@ -157,19 +163,25 @@ func DeleteRoom(c *gin.Context) {
 		return
 	}
 
-	// 1. Delete Room Metadata
+	// 1. Delete from MinIO first (before any metadata changes)
+	// Use DeleteByPrefix to remove all files in the room's folder
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	if err := state.MinIOClient.DeleteByPrefix(cleanupCtx, slug+"/"); err != nil {
+		log.Printf("Warning: failed to delete MinIO files for room %s: %v", slug, err)
+		// Continue with deletion even if MinIO cleanup fails - we can clean up orphaned files later
+	}
+	cleanupCancel()
+
+	// 2. Delete Room Metadata
 	_, err = collection.DeleteOne(ctx, bson.M{"slug": slug})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
 
-	// 2. Delete Associated Files
+	// 3. Delete File Metadata
 	fileCollection := state.MongoDatabase.Collection("files")
 	_, _ = fileCollection.DeleteMany(ctx, bson.M{"room_id": slug})
-
-	// 3. Cleanup Disk (Uploads)
-	_ = os.RemoveAll("uploads/" + slug)
 
 	// 4. Close WebSocket Connections
 	ws.MainHub.CloseRoom(slug)
@@ -229,6 +241,12 @@ func SaveRoom(c *gin.Context) {
 	if result.MatchedCount == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
 		return
+	}
+
+	// Update file TTL to match room TTL
+	if err := state.UpdateFilesTTL(slug, newExpiry); err != nil {
+		log.Printf("Failed to update file TTL for room %s: %v", slug, err)
+		// Don't fail the request - files can still be cleaned up
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Room saved"})
