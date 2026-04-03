@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import api from "./utils/api";
-import { getSession, getUserID } from "./utils/session";
+import { getUserID } from "./utils/session";
 import { toast } from "./components/Toaster";
 import { useNavigate } from "react-router-dom";
 import { StartupAnimation } from "./components/StartupAnimation";
@@ -31,19 +31,11 @@ export const LandingPage: React.FC = () => {
     // sessionStorage.setItem("notex_intro_seen", "true");
   };
 
-  // Get user ID from session (already initialized in App.tsx)
-  const getUserId = () => {
-    const session = getSession();
-    if (session) return session.userID;
-    // Fallback to legacy storage
-    return getUserID() || "";
-  };
-
   const saveUsername = () => {
     if (username.trim()) {
       localStorage.setItem("notex_username", username.trim());
     }
-    getUserId(); // Ensure ID exists when interacting
+    getUserID(); // Ensure ID exists when interacting
   };
 
   const handleJoinRoom = () => {
@@ -65,7 +57,7 @@ export const LandingPage: React.FC = () => {
     setLoading(true);
     try {
       const payload: any = {
-        owner: getUserId(),
+        owner: getUserID(),
       };
 
       // Add custom slug if provided

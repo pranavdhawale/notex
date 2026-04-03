@@ -12,7 +12,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/pranavdhawale/notex/server/internal/models"
 	"github.com/pranavdhawale/notex/server/internal/state"
-	"github.com/pranavdhawale/notex/server/internal/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -76,18 +75,9 @@ func ServeWs(hub *Hub, c *gin.Context) {
 		return
 	}
 
-	// Validate session token from query parameter (optional, for awareness tracking)
-	token := c.Query("token")
-	if token != "" {
-		session, err := utils.ValidateToken(token)
-		if err != nil {
-			log.Printf("Invalid session token for WebSocket: %v", err)
-			// Continue without user ID - just log the connection
-		} else {
-			// User ID is available for future features (e.g., presence tracking)
-			_ = session.UserID // Currently unused but available
-		}
-	}
+	// Extract userID from query parameter (for presence tracking)
+	// This is optional - the userID is also sent via X-User-ID header in HTTP requests
+	_ = c.Query("userID") // Currently unused but available for future features
 
 	// CHECK: Verify room exists in DB
 	collection := state.MongoDatabase.Collection("rooms")

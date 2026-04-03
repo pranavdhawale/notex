@@ -3,12 +3,6 @@ import { createPortal } from "react-dom";
 import {
   X,
   Upload,
-  File,
-  FileText,
-  ImageIcon,
-  Code,
-  Music,
-  Film,
   Download,
   Loader2,
   FolderX,
@@ -18,6 +12,7 @@ import {
 import { ConfirmationModal } from "../components/ConfirmationModal";
 import { toast } from "../components/Toaster";
 import api from "../utils/api";
+import { getFileIcon } from "../utils/fileIcons";
 import "./Editor.css"; // Import shared styles for file items
 import "./FilesModal.css";
 
@@ -130,36 +125,6 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   const confirmDeleteAll = async () => {
     await onDeleteAll(deleteScope);
     setShowDeleteConfirmation(false); // Close after confirming
-  };
-
-  const getFileIcon = (filename: string) => {
-    const ext = filename.split(".").pop()?.toLowerCase();
-    switch (ext) {
-      case "png":
-      case "jpg":
-      case "jpeg":
-      case "gif":
-      case "svg":
-        return <ImageIcon size={18} />;
-      case "mp4":
-      case "mov":
-      case "avi":
-        return <Film size={18} />;
-      case "mp3":
-      case "wav":
-        return <Music size={18} />;
-      case "js":
-      case "ts":
-      case "tsx":
-      case "py":
-      case "json":
-        return <Code size={18} />;
-      case "txt":
-      case "md":
-        return <FileText size={18} />;
-      default:
-        return <File size={18} />;
-    }
   };
 
   if (!isOpen) return null;

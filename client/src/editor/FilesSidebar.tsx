@@ -4,14 +4,8 @@ import api from "../utils/api";
 import axios from "axios";
 import * as Y from "yjs";
 import {
-  File,
   Trash2,
   Upload,
-  FileText,
-  Image as ImageIcon,
-  Film,
-  Music,
-  Code,
   X,
   Download,
   FolderX,
@@ -20,6 +14,7 @@ import {
 } from "lucide-react";
 import { ConfirmationModal } from "../components/ConfirmationModal";
 import { toast } from "../components/Toaster";
+import { getFileIcon } from "../utils/fileIcons";
 
 interface FilesSidebarProps {
   roomSlug: string;
@@ -255,36 +250,6 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       }
     } finally {
       setActiveUploads((prev) => prev.filter((u) => u.id !== uploadId));
-    }
-  };
-
-  const getFileIcon = (filename: string) => {
-    const ext = filename.split(".").pop()?.toLowerCase();
-    switch (ext) {
-      case "png":
-      case "jpg":
-      case "jpeg":
-      case "gif":
-      case "svg":
-        return <ImageIcon size={18} />;
-      case "mp4":
-      case "mov":
-      case "avi":
-        return <Film size={18} />;
-      case "mp3":
-      case "wav":
-        return <Music size={18} />;
-      case "js":
-      case "ts":
-      case "tsx":
-      case "py":
-      case "json":
-        return <Code size={18} />;
-      case "txt":
-      case "md":
-        return <FileText size={18} />;
-      default:
-        return <File size={18} />;
     }
   };
 

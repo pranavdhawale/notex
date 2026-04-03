@@ -30,6 +30,7 @@ import { cacheManager } from "../utils/SmartCacheManager";
 import { NotFoundView } from "../components/NotFoundView";
 import { toast } from "../components/Toaster";
 import { KeyboardShortcutsPopup } from "../components/KeyboardShortcutsPopup";
+import { CURSOR_COLORS } from "../utils/constants";
 
 interface EditorProps {
   roomSlug: string;
@@ -37,17 +38,6 @@ interface EditorProps {
   userId: string;
   isOwner: boolean;
 }
-
-// Custom colors for cursors
-const cursorColors = [
-  "#958DF1",
-  "#F98181",
-  "#FBBC88",
-  "#FAF594",
-  "#70CFF8",
-  "#94FADB",
-  "#B9F18D",
-];
 
 const TiptapEditor: React.FC<{
   provider: WebsocketProvider;
@@ -482,7 +472,7 @@ export const Editor: React.FC<EditorProps> = ({
   const [userDetails] = useState(() => {
     let color = localStorage.getItem("notex_user_color");
     if (!color) {
-      color = cursorColors[Math.floor(Math.random() * cursorColors.length)];
+      color = CURSOR_COLORS[Math.floor(Math.random() * CURSOR_COLORS.length)];
       localStorage.setItem("notex_user_color", color);
     }
     return {

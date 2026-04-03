@@ -1,14 +1,13 @@
-import { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { Editor } from "./editor/Editor";
 import { LandingPage } from "./LandingPage";
-import { getOrCreateSession, getSession } from "./utils/session";
+import { getUserID } from "./utils/session";
 import "./App.css";
 
 const EditorRoute = () => {
   const { roomSlug } = useParams<{ roomSlug: string }>();
   const [username, setUsername] = useState(
-    localStorage.getItem("notex_username") || "",
+    localStorage.getItem("notex_username") || ""
   );
   const [tempName, setTempName] = useState("");
   const [isOwner, setIsOwner] = useState(false);
@@ -16,23 +15,22 @@ const EditorRoute = () => {
   // Verify ownership by fetching room details
   useEffect(() => {
     if (roomSlug) {
-      // Use fetch since we need to check room details without auth
+      const userID = getUserID();
       fetch(
         `${
           import.meta.env.VITE_API_URL || "http://localhost:8080"
-        }/api/rooms/${roomSlug}`,
+        }/api/rooms/${roomSlug}`
       )
         .then((res) => res.json())
         .then((data) => {
-          const session = getSession();
-          if (data.owner && session && data.owner === session.userID) {
+          if (data.owner && data.owner === userID) {
             setIsOwner(true);
           }
         })
         .catch((err) => {
           console.error(
             "Failed to fetch room details for ownership check",
-            err,
+            err
           );
         });
     }
@@ -110,8 +108,8 @@ const EditorRoute = () => {
 
   if (!roomSlug) return <div>Invalid Room</div>;
 
-  // Get user ID from session
-  const userId = getUserID() || "";
+  // Get persistent user ID
+  const userId = getUserID();
 
   // Render Editor directly without app-header wrapper
   return (
@@ -126,10 +124,11 @@ const EditorRoute = () => {
   );
 };
 
+import { useState, useEffect } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeContext";
 import Particles from "./components/Particles";
 import { Toaster } from "./components/Toaster";
-import { getUserID } from "./utils/session";
 
 const GlobalParticles = () => {
   const particleColor = "#ffffff"; // White particles for dark mode
@@ -151,54 +150,6 @@ const GlobalParticles = () => {
 };
 
 function App() {
-  const [sessionReady, setSessionReady] = useState(false);
-  const [sessionError, setSessionError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Initialize session on app load
-    getOrCreateSession()
-      .then(() => setSessionReady(true))
-      .catch((err) => {
-        console.error('Session initialization failed:', err);
-        setSessionError(err.message);
-        setSessionReady(true); // Continue anyway for graceful degradation
-      });
-  }, []);
-
-  if (sessionError && !sessionReady) {
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        color: 'var(--text-main)',
-        textAlign: 'center',
-        padding: '20px'
-      }}>
-        <div>
-          <h2>Connection Error</h2>
-          <p>{sessionError}</p>
-          <button onClick={() => window.location.reload()}>Retry</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!sessionReady) {
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        color: 'var(--text-main)'
-      }}>
-        <p>Initializing...</p>
-      </div>
-    );
-  }
-
   return (
     <ThemeProvider>
       <GlobalParticles />
