@@ -260,6 +260,12 @@ func DeleteAllFiles(c *gin.Context) {
 		return
 	}
 
+	// Validate targetUser parameter - only "me" or empty are allowed
+	if targetUser != "" && targetUser != "me" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user parameter. Use 'me' or omit for all files."})
+		return
+	}
+
 	collection := state.MongoDatabase.Collection("files")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -279,6 +285,7 @@ func DeleteAllFiles(c *gin.Context) {
 	if targetUser == "me" {
 		filter["uploader_id"] = requestorID
 	} else {
+		// Delete all files - only room owner can do this
 		if room.Owner != requestorID {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Only room owner can delete all files"})
 			return
