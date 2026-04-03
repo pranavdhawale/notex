@@ -1,0 +1,106 @@
+/* Keyboard Shortcuts Popup */
+.shortcuts-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+}
+
+.shortcuts-popup {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  width: 400px;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.08));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  border-radius: 16px;
+  box-shadow: var(--glass-shadow, 0 8px 32px rgba(0, 0, 0, 0.3));
+  padding: 16px;
+}
+
+.shortcuts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+}
+
+.shortcuts-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main, #fff);
+}
+
+.shortcuts-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, background 0.2s;
+}
+
+.shortcuts-close:hover {
+  color: var(--text-main, #fff);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.shortcuts-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
+}
+
+.shortcuts-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shortcuts-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.5));
+  margin: 0;
+  margin-bottom: 4px;
+}
+
+.shortcuts-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.shortcuts-action {
+  font-size: 13px;
+  color: var(--text-main, #fff);
+}
+
+.shortcuts-key {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+  white-space: nowrap;
+}
+
+.shortcuts-key.no-shortcut {
+  color: var(--text-muted, rgba(255, 255, 255, 0.35));
+  background: transparent;
+  border-color: transparent;
+}
