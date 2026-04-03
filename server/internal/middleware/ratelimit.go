@@ -9,15 +9,15 @@ import (
 
 // RateLimiter provides in-memory rate limiting using a sliding window
 type RateLimiter struct {
-	requests   sync.Map // map[string]*requestCount
+	requests    sync.Map // map[string]*requestCount
 	maxRequests int
 	windowSize  time.Duration
 }
 
 type requestCount struct {
-	count      int
+	count       int
 	windowStart time.Time
-	mu         sync.Mutex
+	mu          sync.Mutex
 }
 
 // NewRateLimiter creates a new rate limiter
@@ -34,7 +34,7 @@ func (r *RateLimiter) Allow(key string) bool {
 
 	// Get or create counter for this key
 	value, _ := r.requests.LoadOrStore(key, &requestCount{
-		count:      0,
+		count:       0,
 		windowStart: now,
 	})
 
@@ -57,7 +57,7 @@ func (r *RateLimiter) Allow(key string) bool {
 	return true
 }
 
-// Cleanup removes old entries periodically (call from a goroutine)
+// Cleanup removes old entries periodically
 func (r *RateLimiter) Cleanup() {
 	now := time.Now()
 	r.requests.Range(func(key, value interface{}) bool {
@@ -73,30 +73,18 @@ func (r *RateLimiter) Cleanup() {
 
 // Global rate limiters
 var (
-	// Session creation: 5 per IP per minute
-	SessionLimiter = NewRateLimiter(5, time.Minute)
-
 	// File uploads: 10 per room+user per minute
 	UploadLimiter = NewRateLimiter(10, time.Minute)
 
 	// Room creation: 5 per IP per minute
 	RoomLimiter = NewRateLimiter(5, time.Minute)
-)
 
-// RateLimitSession limits session creation requests per IP
-func RateLimitSession() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		ip := c.ClientIP()
-		if !SessionLimiter.Allow(ip) {
-			c.JSON(429, gin.H{
-				"error": "Too many session requests. Please wait a minute and try again.",
-			})
-			c.Abort()
-			return
-		}
-		c.Next()
-	}
-}
+	// Room save: 30 per room per minute (aut-save is frequent)
+	SaveLimiter = NewRateLimiter(30, time.Minute)
+
+	// Shutdown channel for cleanup goroutine
+	shutdownCh = make(chan struct{})
+)
 
 // RateLimitUpload limits file upload requests per room+user
 func RateLimitUpload() gin.HandlerFunc {
@@ -132,15 +120,41 @@ func RateLimitRoom() gin.HandlerFunc {
 	}
 }
 
-// init starts cleanup goroutine
+// RateLimitSave limits room save requests per room
+func RateLimitSave() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		room := c.Param("room")
+		if !SaveLimiter.Allow(room) {
+			c.JSON(429, gin.H{
+				"error": "Too many save requests. Please wait a moment.",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// Shutdown stops the cleanup goroutine
+func Shutdown() {
+	close(shutdownCh)
+}
+
+// init starts cleanup goroutine with proper shutdown handling
 func init() {
 	go func() {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
-		for range ticker.C {
-			SessionLimiter.Cleanup()
-			UploadLimiter.Cleanup()
-			RoomLimiter.Cleanup()
+
+		for {
+			select {
+			case <-ticker.C:
+				UploadLimiter.Cleanup()
+				RoomLimiter.Cleanup()
+				SaveLimiter.Cleanup()
+			case <-shutdownCh:
+				return
+			}
 		}
 	}()
 }

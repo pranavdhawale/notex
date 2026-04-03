@@ -181,11 +181,24 @@ type SaveRoomRequest struct {
 	Content interface{} `json:"content"`
 }
 
+// Max content size for room saves (10MB)
+const MaxContentSize = 10 * 1024 * 1024
+
 func SaveRoom(c *gin.Context) {
 	slug := c.Param("room")
+
+	// Limit request body size
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, int64(MaxContentSize))
+
 	var req SaveRoomRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	// Validate content is not nil
+	if req.Content == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Content is required"})
 		return
 	}
 
@@ -196,10 +209,10 @@ func SaveRoom(c *gin.Context) {
 	// Use Upsert: false to prevent creating rooms on save if they don't exist
 	opts := options.Update().SetUpsert(false)
 	filter := bson.M{"slug": slug}
-	
+
 	// Saving implies content exists -> 7 Days TTL
 	newExpiry := calculateExpiry(true)
-	
+
 	update := bson.M{
 		"$set": bson.M{
 			"content":   req.Content,
