@@ -11,6 +11,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/joho/godotenv"
 	"github.com/pranavdhawale/notex/server/internal/api"
+	"github.com/pranavdhawale/notex/server/internal/cleanup"
 	"github.com/pranavdhawale/notex/server/internal/middleware"
 	"github.com/pranavdhawale/notex/server/internal/state"
 	"github.com/pranavdhawale/notex/server/internal/ws"
@@ -47,6 +48,10 @@ func main() {
 	if err := state.MinIOClient.EnsureBucket(ctx); err != nil {
 		log.Fatalf("Failed to ensure MinIO bucket: %v", err)
 	}
+
+	// Start background cleanup for orphaned files (runs every hour)
+	// This handles cases where MongoDB TTL expires rooms but MinIO files remain
+	cleanup.StartOrphanedFilesCleanup(1 * time.Hour)
 
 	r := gin.Default()
 
