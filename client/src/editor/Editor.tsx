@@ -29,6 +29,7 @@ import { useNavigate } from "react-router-dom";
 import { cacheManager } from "../utils/SmartCacheManager";
 import { NotFoundView } from "../components/NotFoundView";
 import { toast } from "../components/Toaster";
+import { KeyboardShortcutsPopup } from "../components/KeyboardShortcutsPopup";
 
 interface EditorProps {
   roomSlug: string;
@@ -342,6 +343,7 @@ export const Editor: React.FC<EditorProps> = ({
     return saved === null ? true : saved === "true";
   });
   const [showFilesModal, setShowFilesModal] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [files, setFiles] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
@@ -693,6 +695,38 @@ export const Editor: React.FC<EditorProps> = ({
     }
   };
 
+  // Keep a ref to handleSave to avoid stale closure in keyboard handler
+  const handleSaveRef = useRef(handleSave);
+
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  }, [handleSave]);
+
+  // Keyboard shortcuts listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().includes("MAC");
+      const modKey = isMac ? e.metaKey : e.ctrlKey;
+
+      // Ctrl/Cmd + S - Save
+      if (modKey && e.key === "s") {
+        e.preventDefault();
+        handleSaveRef.current(false);
+        return;
+      }
+
+      // Ctrl/Cmd + / - Toggle shortcuts popup
+      if (modKey && e.key === "/") {
+        e.preventDefault();
+        setShowShortcuts((prev) => !prev);
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   if (notFound) {
     return <NotFoundView />;
   }
@@ -750,6 +784,12 @@ export const Editor: React.FC<EditorProps> = ({
         userId={userId}
         roomSlug={roomSlug}
         isRoomOwner={isOwner}
+      />
+
+      {/* Keyboard Shortcuts Popup */}
+      <KeyboardShortcutsPopup
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
       />
     </div>
   );
