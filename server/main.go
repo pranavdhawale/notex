@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,7 +13,6 @@ import (
 	"github.com/pranavdhawale/notex/server/internal/api"
 	"github.com/pranavdhawale/notex/server/internal/middleware"
 	"github.com/pranavdhawale/notex/server/internal/state"
-	"github.com/pranavdhawale/notex/server/internal/utils"
 	"github.com/pranavdhawale/notex/server/internal/ws"
 )
 
@@ -62,65 +60,26 @@ func main() {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{clientOrigin},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "X-User-ID", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "X-User-ID"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
 
-
-		// Security Headers
-		r.Use(func(c *gin.Context) {
-			c.Header("X-Content-Type-Options", "nosniff")
-			c.Header("X-Frame-Options", "DENY")
-			c.Header("X-XSS-Protection", "1; mode=block")
-			c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none';")
-			c.Next()
-		})
+	// Security Headers
+	r.Use(func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("X-XSS-Protection", "1; mode=block")
+		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none';")
+		c.Next()
+	})
 
 	// Health Check
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"status": "ok",
+			"status":  "ok",
 			"service": "notex-backend",
-		})
-	})
-
-	// Session endpoint - creates or refreshes session token (public)
-	// Rate limited: 5 new sessions per IP per minute
-	r.GET("/api/session", middleware.RateLimitSession(), func(c *gin.Context) {
-		// Check if user already has a valid token
-		authHeader := c.GetHeader("Authorization")
-		var userID string
-
-		if authHeader != "" {
-			parts := strings.Split(authHeader, " ")
-			if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
-				session, err := utils.ValidateToken(parts[1])
-				if err == nil {
-					// Token is valid, return it
-					c.JSON(http.StatusOK, gin.H{
-						"token":   parts[1],
-						"userID":  session.UserID,
-						"isNew":   false,
-					})
-					return
-				}
-			}
-		}
-
-		// Generate new user ID and token
-		userID = utils.GenerateUserID()
-		token, err := utils.GenerateToken(userID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate session"})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"token":   token,
-			"userID":  userID,
-			"isNew":   true,
 		})
 	})
 
@@ -128,16 +87,17 @@ func main() {
 	apiGroup := r.Group("/api")
 
 	// Public routes (no auth required)
-		// Room creation - rate limited: 5 per IP per minute
+	// Room creation - rate limited: 5 per IP per minute
 	apiGroup.POST("/rooms", middleware.RateLimitRoom(), api.CreateRoom)
 	apiGroup.GET("/rooms/:room", api.GetRoom)
 
-	// Protected routes (require auth)
+	// Protected routes (require X-User-ID header)
 	protected := apiGroup.Group("")
 	protected.Use(middleware.AuthRequired())
 	{
 		protected.DELETE("/rooms/:room", api.DeleteRoom)
-		protected.POST("/rooms/:room/save", api.SaveRoom)
+		// Room save - rate limited: 30 per room per minute
+		protected.POST("/rooms/:room/save", middleware.RateLimitSave(), api.SaveRoom)
 		// File upload - rate limited: 10 uploads per room per user per minute
 		protected.POST("/upload/:room", middleware.RateLimitUpload(), api.UploadFile)
 		protected.GET("/rooms/:room/files", api.ListFiles)
