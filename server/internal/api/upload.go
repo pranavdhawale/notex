@@ -14,6 +14,7 @@ import (
 	"github.com/pranavdhawale/notex/server/internal/models"
 	"github.com/pranavdhawale/notex/server/internal/state"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -42,6 +43,22 @@ func sanitizeFilename(name string) string {
 
 func UploadFile(c *gin.Context) {
 	roomID := c.Param("room")
+
+	// Check if room exists and get its expiration time
+	roomCollection := state.MongoDatabase.Collection("rooms")
+	roomCtx, roomCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	var room models.Room
+	err := roomCollection.FindOne(roomCtx, bson.M{"slug": roomID}).Decode(&room)
+	roomCancel()
+
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -91,7 +108,7 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 
-	// Create File Record
+	// Create File Record with TTL matching room's expiration
 	fileRecord := models.File{
 		ID:         uniqueId,
 		RoomID:     roomID,
@@ -100,6 +117,7 @@ func UploadFile(c *gin.Context) {
 		Size:       file.Size,
 		StorageKey: storageKey,
 		CreatedAt:  time.Now(),
+		ExpireAt:   room.ExpireAt, // Inherit TTL from room
 	}
 
 	// Save to Mongo
@@ -111,7 +129,9 @@ func UploadFile(c *gin.Context) {
 	if err != nil {
 		// Try to cleanup MinIO on database failure
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		state.MinIOClient.Delete(cleanupCtx, storageKey)
+		if cleanupErr := state.MinIOClient.Delete(cleanupCtx, storageKey); cleanupErr != nil {
+			log.Printf("Warning: failed to cleanup MinIO file %s after DB error: %v", storageKey, cleanupErr)
+		}
 		cleanupCancel()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
