@@ -6,6 +6,31 @@ interface CacheEntry {
   size: number;
 }
 
+/** Storage quota warning threshold (4MB - typical sessionStorage limit is 5-10MB) */
+const QUOTA_WARNING_THRESHOLD = 4 * 1024 * 1024;
+
+/** Track if we've shown the quota warning to avoid spam */
+let quotaWarningShown = false;
+
+/**
+ * Show a warning notification about storage quota
+ * Uses console.warn for now - can be integrated with toast system
+ */
+function notifyQuotaWarning(): void {
+  if (quotaWarningShown) return;
+  quotaWarningShown = true;
+
+  console.warn(
+    "⚠️ Storage quota nearly exceeded. Your document may not sync properly if storage is full. " +
+    "Consider closing other browser tabs to free memory."
+  );
+
+  // Reset warning flag after 5 minutes to allow showing again
+  setTimeout(() => {
+    quotaWarningShown = false;
+  }, 5 * 60 * 1000);
+}
+
 export class SmartCacheManager {
   private readonly prefix = "notex_room_";
   private readonly yjsPrefix = "notex_yjs_";
@@ -16,6 +41,14 @@ export class SmartCacheManager {
    */
   save(roomSlug: string, content: string): void {
     try {
+      // Check approximate storage size before saving
+      const currentSize = this.getCurrentStorageSize();
+      const newSize = content.length * 2; // Rough estimate (UTF-16)
+
+      if (currentSize + newSize > QUOTA_WARNING_THRESHOLD) {
+        notifyQuotaWarning();
+      }
+
       // Compress string data using gzip
       const compressed = pako.deflate(content);
       // Convert Uint8Array to base64 string for storage
@@ -31,8 +64,11 @@ export class SmartCacheManager {
         JSON.stringify(entry),
       );
     } catch (e: any) {
-      if (e.name === "QuotaExceededError") {
-        console.warn("SessionStorage quota exceeded! Cannot save room cache.");
+      if (e.name === "QuotaExceededError" || e.code === 22) {
+        console.error("❌ SessionStorage quota exceeded! Cannot save room cache.");
+        // Clear oldest caches to try to make room
+        this.clearOldestCaches();
+        throw new Error("Storage quota exceeded. Some data may not be saved.");
       } else {
         console.error("Failed to save to cache:", e);
       }
@@ -89,8 +125,13 @@ export class SmartCacheManager {
       const update = Y.encodeStateAsUpdate(doc);
       const base64 = btoa(String.fromCharCode(...update));
       sessionStorage.setItem(`${this.yjsPrefix}${roomSlug}`, base64);
-    } catch (e) {
-      console.error("Failed to save Yjs cache:", e);
+    } catch (e: any) {
+      if (e.name === "QuotaExceededError" || e.code === 22) {
+        console.error("❌ SessionStorage quota exceeded! Cannot save Yjs state.");
+        this.clearOldestCaches();
+      } else {
+        console.error("Failed to save Yjs cache:", e);
+      }
     }
   }
 
@@ -151,6 +192,37 @@ export class SmartCacheManager {
         sizeMB: (r.size / (1024 * 1024)).toFixed(2),
       })),
     };
+  }
+
+  /**
+   * Get current storage size in bytes
+   */
+  private getCurrentStorageSize(): number {
+    let size = 0;
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key) {
+        const value = sessionStorage.getItem(key);
+        if (value) {
+          size += key.length * 2 + value.length * 2; // UTF-16 encoding
+        }
+      }
+    }
+    return size;
+  }
+
+  /**
+   * Clear oldest cache entries to free space
+   */
+  private clearOldestCaches(): void {
+    const rooms = this.getAllRooms();
+    // Remove oldest 25% of caches
+    const toRemove = Math.ceil(rooms.length * 0.25);
+    console.warn(`🗑️ Clearing ${toRemove} oldest cache entries to free space`);
+
+    for (let i = 0; i < toRemove && i < rooms.length; i++) {
+      this.remove(rooms[i].slug);
+    }
   }
 
   /**
