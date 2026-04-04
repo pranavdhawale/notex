@@ -24,12 +24,13 @@ import { FilesModal } from "./FilesModal";
 import { Toolbar } from "./Toolbar";
 import { TableContextMenu } from "./TableContextMenu";
 import api, { getWebSocketUrl } from "../utils/api";
-import { Users, LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown } from "lucide-react";
+import { Users, LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown, Key } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cacheManager } from "../utils/SmartCacheManager";
 import { NotFoundView } from "../components/NotFoundView";
 import { toast } from "../components/Toaster";
 import { KeyboardShortcutsPopup } from "../components/KeyboardShortcutsPopup";
+import { LockRoomModal, UnlockRoomModal } from "../components/LockUnlockModal";
 import { CURSOR_COLORS } from "../utils/constants";
 
 interface EditorProps {
@@ -37,6 +38,9 @@ interface EditorProps {
   username: string;
   userId: string;
   isOwner: boolean;
+  authToken?: string;
+  roomLocked: boolean;
+  onLockChange: (locked: boolean, token?: string) => void;
 }
 
 const TiptapEditor: React.FC<{
@@ -45,6 +49,7 @@ const TiptapEditor: React.FC<{
   roomSlug: string;
   status: string;
   isOwner: boolean;
+  roomLocked: boolean;
   saving: boolean;
   showUsers: boolean;
   setShowUsers: (show: boolean) => void;
@@ -52,12 +57,15 @@ const TiptapEditor: React.FC<{
   handleLeave: () => void;
   handleDeleteRoom: () => void;
   handleSave: () => void;
+  onLockRoom: () => void;
+  onUnlockRoom: () => void;
 }> = ({
   provider,
   userDetails,
   roomSlug,
   status,
   isOwner,
+  roomLocked,
   saving,
   showUsers,
   setShowUsers,
@@ -65,6 +73,8 @@ const TiptapEditor: React.FC<{
   handleLeave,
   handleDeleteRoom,
   handleSave,
+  onLockRoom,
+  onUnlockRoom,
 }) => {
   const [menuState, setMenuState] = useState({ isOpen: false, x: 0, y: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -243,6 +253,16 @@ const TiptapEditor: React.FC<{
             </div>
 
             <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              {isOwner && (
+                <button
+                  onClick={roomLocked ? onUnlockRoom : onLockRoom}
+                  className="btn-icon"
+                  style={{ color: roomLocked ? "var(--color-primary)" : "var(--text-secondary)" }}
+                  title={roomLocked ? "Unlock Room" : "Lock Room"}
+                >
+                  <Key size={18} />
+                </button>
+              )}
               <button
                 onClick={handleSave}
                 disabled={saving}
@@ -322,11 +342,16 @@ export const Editor: React.FC<EditorProps> = ({
   username,
   userId,
   isOwner,
+  authToken,
+  roomLocked,
+  onLockChange,
 }) => {
   const [provider, setProvider] = useState<WebsocketProvider | null>(null);
   const [status, setStatus] = useState("connecting");
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showLockModal, setShowLockModal] = useState(false);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [showUsers, setShowUsers] = useState(() => {
     const saved = localStorage.getItem("notex_show_users");
@@ -617,7 +642,7 @@ export const Editor: React.FC<EditorProps> = ({
       }
 
       // Create provider with connect: false to prevent early sync
-      const wsUrl = getWebSocketUrl(roomSlug);
+      const wsUrl = getWebSocketUrl(roomSlug, authToken);
       provider = new WebsocketProvider(wsUrl, roomSlug, doc, {
         connect: false
       });
@@ -659,7 +684,7 @@ export const Editor: React.FC<EditorProps> = ({
       setProvider(null);
       setYdoc(null);
     };
-  }, [roomSlug, userDetails]);
+  }, [roomSlug, userDetails, authToken]);
 
   const handleSave = async (silent = false) => {
     if (!ydoc) return;
@@ -743,6 +768,7 @@ export const Editor: React.FC<EditorProps> = ({
           roomSlug={roomSlug}
           status={status}
           isOwner={isOwner}
+          roomLocked={roomLocked}
           saving={saving}
           showUsers={showUsers}
           setShowUsers={setShowUsers}
@@ -750,6 +776,8 @@ export const Editor: React.FC<EditorProps> = ({
           handleLeave={handleLeave}
           handleDeleteRoom={handleDeleteRoom}
           handleSave={() => handleSave(false)}
+          onLockRoom={() => setShowLockModal(true)}
+          onUnlockRoom={() => setShowUnlockModal(true)}
         />
       </div>
 
@@ -780,6 +808,26 @@ export const Editor: React.FC<EditorProps> = ({
       <KeyboardShortcutsPopup
         isOpen={showShortcuts}
         onClose={() => setShowShortcuts(false)}
+      />
+
+      {/* Lock/Unlock Modals */}
+      <LockRoomModal
+        roomSlug={roomSlug}
+        isOpen={showLockModal}
+        onClose={() => setShowLockModal(false)}
+        onSuccess={(token) => {
+          onLockChange(true, token);
+          setShowLockModal(false);
+        }}
+      />
+      <UnlockRoomModal
+        roomSlug={roomSlug}
+        isOpen={showUnlockModal}
+        onClose={() => setShowUnlockModal(false)}
+        onSuccess={() => {
+          onLockChange(false);
+          setShowUnlockModal(false);
+        }}
       />
     </div>
   );
