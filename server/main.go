@@ -96,6 +96,9 @@ func main() {
 	apiGroup.POST("/rooms", middleware.RateLimitRoom(), api.CreateRoom)
 	apiGroup.GET("/rooms/:room", api.GetRoom)
 
+	// Password verification - rate limited: 5 per IP+room per minute
+	apiGroup.POST("/rooms/:room/verify-password", middleware.RateLimitPassword(), api.VerifyPassword)
+
 	// Protected routes (require X-User-ID header)
 	protected := apiGroup.Group("")
 	protected.Use(middleware.AuthRequired())
@@ -103,6 +106,9 @@ func main() {
 		protected.DELETE("/rooms/:room", api.DeleteRoom)
 		// Room save - rate limited: 30 per room per minute
 		protected.POST("/rooms/:room/save", middleware.RateLimitSave(), api.SaveRoom)
+		// Room lock/unlock (owner only)
+		protected.PUT("/rooms/:room/lock", api.LockRoom)
+		protected.PUT("/rooms/:room/unlock", api.UnlockRoom)
 		// File upload - rate limited: 10 uploads per room per user per minute
 		protected.POST("/upload/:room", middleware.RateLimitUpload(), api.UploadFile)
 		protected.GET("/rooms/:room/files", api.ListFiles)

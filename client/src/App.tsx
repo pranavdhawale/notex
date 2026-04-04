@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { Editor } from "./editor/Editor";
 import { LandingPage } from "./LandingPage";
+import { PasswordPrompt } from "./components/PasswordPrompt";
 import { getUserID } from "./utils/session";
 import "./App.css";
 
@@ -11,8 +12,12 @@ const EditorRoute = () => {
   );
   const [tempName, setTempName] = useState("");
   const [isOwner, setIsOwner] = useState(false);
+  const [roomLocked, setRoomLocked] = useState(false);
+  const [roomChecked, setRoomChecked] = useState(false);
+  const [roomExists, setRoomExists] = useState(true);
+  const [authToken, setAuthToken] = useState<string | null>(null);
 
-  // Verify ownership by fetching room details
+  // Fetch room details including lock status
   useEffect(() => {
     if (roomSlug) {
       const userID = getUserID();
@@ -21,21 +26,44 @@ const EditorRoute = () => {
           import.meta.env.VITE_API_URL || "http://localhost:8080"
         }/api/rooms/${roomSlug}`
       )
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) {
+            if (res.status === 404) {
+              setRoomExists(false);
+            }
+            throw new Error("Failed to fetch room");
+          }
+          return res.json();
+        })
         .then((data) => {
           if (data.owner && data.owner === userID) {
             setIsOwner(true);
           }
+          setRoomLocked(data.locked || false);
+          setRoomExists(true);
+          setRoomChecked(true);
         })
         .catch((err) => {
-          console.error(
-            "Failed to fetch room details for ownership check",
-            err
-          );
+          console.error("Failed to fetch room details", err);
+          setRoomChecked(true);
         });
     }
   }, [roomSlug]);
 
+  // Handle successful password authentication
+  const handleAuthenticated = (token: string) => {
+    setAuthToken(token);
+  };
+
+  // Handle lock state changes from Editor
+  const handleLockChange = (locked: boolean, token?: string) => {
+    setRoomLocked(locked);
+    if (token) {
+      setAuthToken(token);
+    }
+  };
+
+  // Name prompt
   if (!username) {
     return (
       <div
@@ -108,6 +136,53 @@ const EditorRoute = () => {
 
   if (!roomSlug) return <div>Invalid Room</div>;
 
+  // Room not found
+  if (roomChecked && !roomExists) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+          color: "var(--text-main)",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <h2>Room Not Found</h2>
+          <p>This room may have expired or been deleted.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Still loading room info
+  if (!roomChecked) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+          color: "var(--text-main)",
+        }}
+      >
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
+  // Room is locked and user hasn't authenticated
+  if (roomLocked && !authToken) {
+    return (
+      <PasswordPrompt
+        roomSlug={roomSlug}
+        onAuthenticated={handleAuthenticated}
+      />
+    );
+  }
+
   // Get persistent user ID
   const userId = getUserID();
 
@@ -119,6 +194,9 @@ const EditorRoute = () => {
         username={username}
         userId={userId}
         isOwner={isOwner}
+        authToken={authToken || undefined}
+        roomLocked={roomLocked}
+        onLockChange={handleLockChange}
       />
     </div>
   );

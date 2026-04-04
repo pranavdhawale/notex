@@ -97,6 +97,25 @@ func ServeWs(hub *Hub, c *gin.Context) {
 		return
 	}
 
+	// CHECK: If room is locked, validate auth token
+	if room.Locked {
+		authToken := c.Query("authToken")
+		if authToken == "" {
+			log.Printf("Attempt to connect to locked room without token: %s", roomID)
+			http.Error(c.Writer, "Room is locked. Authentication required.", http.StatusUnauthorized)
+			return
+		}
+
+		// Validate token
+		tokenRoomSlug, _, valid := state.AuthTokens.Validate(authToken)
+		if !valid || tokenRoomSlug != roomID {
+			log.Printf("Invalid or expired token for locked room: %s", roomID)
+			http.Error(c.Writer, "Invalid or expired authentication token", http.StatusUnauthorized)
+			return
+		}
+		// Token is consumed (single-use) - no need to delete, already deleted by Validate
+	}
+
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("Failed to upgrade websocket: %v", err)

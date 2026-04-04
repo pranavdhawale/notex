@@ -82,6 +82,9 @@ var (
 	// Room save: 30 per room per minute (aut-save is frequent)
 	SaveLimiter = NewRateLimiter(30, time.Minute)
 
+	// Password verification: 5 attempts per IP+room per minute
+	PasswordLimiter = NewRateLimiter(5, time.Minute)
+
 	// Shutdown channel for cleanup goroutine
 	shutdownCh = make(chan struct{})
 )
@@ -135,6 +138,25 @@ func RateLimitSave() gin.HandlerFunc {
 	}
 }
 
+// RateLimitPassword limits password verification attempts per IP+room
+func RateLimitPassword() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		room := c.Param("room")
+		ip := c.ClientIP()
+
+		// Key combines IP and room to limit per-room-per-IP
+		key := ip + ":" + room
+		if !PasswordLimiter.Allow(key) {
+			c.JSON(429, gin.H{
+				"error": "Too many password attempts. Please wait a minute and try again.",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // Shutdown stops the cleanup goroutine
 func Shutdown() {
 	close(shutdownCh)
@@ -152,6 +174,7 @@ func init() {
 				UploadLimiter.Cleanup()
 				RoomLimiter.Cleanup()
 				SaveLimiter.Cleanup()
+				PasswordLimiter.Cleanup()
 			case <-shutdownCh:
 				return
 			}
