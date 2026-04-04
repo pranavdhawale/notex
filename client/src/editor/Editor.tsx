@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Collaboration from "@tiptap/extension-collaboration";
@@ -43,7 +43,11 @@ interface EditorProps {
   onLockChange: (locked: boolean, token?: string) => void;
 }
 
-const TiptapEditor: React.FC<{
+export type EditorRef = {
+  focus: () => void;
+};
+
+const TiptapEditor = forwardRef<EditorRef, {
   provider: WebsocketProvider;
   userDetails: { name: string; color: string; userId: string };
   roomSlug: string;
@@ -59,7 +63,7 @@ const TiptapEditor: React.FC<{
   handleSave: () => void;
   onLockRoom: () => void;
   onUnlockRoom: () => void;
-}> = ({
+}>(({
   provider,
   userDetails,
   roomSlug,
@@ -75,7 +79,7 @@ const TiptapEditor: React.FC<{
   handleSave,
   onLockRoom,
   onUnlockRoom,
-}) => {
+}, ref) => {
   const [menuState, setMenuState] = useState({ isOpen: false, x: 0, y: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -116,6 +120,13 @@ const TiptapEditor: React.FC<{
       // Caching is handled by the ydoc.on('update') listener in parent component
     },
   });
+
+  // Expose focus method to parent
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      editor?.commands.focus();
+    },
+  }), [editor]);
 
   // Auto-hide scrollbar + track scroll position
   useEffect(() => {
@@ -335,7 +346,7 @@ const TiptapEditor: React.FC<{
       </div>
     </div>
   );
-};
+});
 
 export const Editor: React.FC<EditorProps> = ({
   roomSlug,
@@ -362,6 +373,9 @@ export const Editor: React.FC<EditorProps> = ({
   const [files, setFiles] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
+
+  // Editor ref for focus management
+  const editorRef = useRef<EditorRef>(null);
 
   // Track if we're intentionally leaving (deleting room) to prevent false 404 errors
   const isLeavingRef = useRef(false);
@@ -730,6 +744,19 @@ export const Editor: React.FC<EditorProps> = ({
         return;
       }
 
+      // Ctrl/Cmd + L - Lock/Unlock room (owner only)
+      if (modKey && e.key === "l") {
+        e.preventDefault();
+        if (isOwner) {
+          if (roomLocked) {
+            setShowUnlockModal(true);
+          } else {
+            setShowLockModal(true);
+          }
+        }
+        return;
+      }
+
       // Ctrl/Cmd + / - Toggle shortcuts popup
       if (modKey && e.key === "/") {
         e.preventDefault();
@@ -740,7 +767,7 @@ export const Editor: React.FC<EditorProps> = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [isOwner, roomLocked]);
 
   if (notFound) {
     return <NotFoundView />;
@@ -763,6 +790,7 @@ export const Editor: React.FC<EditorProps> = ({
       {/* CENTER: EDITOR */}
       <div className="editor-main">
         <TiptapEditor
+          ref={editorRef}
           provider={provider}
           userDetails={userDetails}
           roomSlug={roomSlug}
@@ -785,13 +813,19 @@ export const Editor: React.FC<EditorProps> = ({
       <UsersSidebar
         provider={provider}
         isOpen={showUsers}
-        onClose={() => setShowUsers(false)}
+        onClose={() => {
+          setShowUsers(false);
+          editorRef.current?.focus();
+        }}
       />
 
       {/* Mobile Files Modal */}
       <FilesModal
         isOpen={showFilesModal}
-        onClose={() => setShowFilesModal(false)}
+        onClose={() => {
+          setShowFilesModal(false);
+          editorRef.current?.focus();
+        }}
         files={files}
         onUpload={handleFileUpload}
         onDelete={handleFileDelete}
@@ -807,14 +841,20 @@ export const Editor: React.FC<EditorProps> = ({
       {/* Keyboard Shortcuts Popup */}
       <KeyboardShortcutsPopup
         isOpen={showShortcuts}
-        onClose={() => setShowShortcuts(false)}
+        onClose={() => {
+          setShowShortcuts(false);
+          editorRef.current?.focus();
+        }}
       />
 
       {/* Lock/Unlock Modals */}
       <LockRoomModal
         roomSlug={roomSlug}
         isOpen={showLockModal}
-        onClose={() => setShowLockModal(false)}
+        onClose={() => {
+          setShowLockModal(false);
+          editorRef.current?.focus();
+        }}
         onSuccess={(token) => {
           onLockChange(true, token);
           setShowLockModal(false);
@@ -823,7 +863,10 @@ export const Editor: React.FC<EditorProps> = ({
       <UnlockRoomModal
         roomSlug={roomSlug}
         isOpen={showUnlockModal}
-        onClose={() => setShowUnlockModal(false)}
+        onClose={() => {
+          setShowUnlockModal(false);
+          editorRef.current?.focus();
+        }}
         onSuccess={() => {
           onLockChange(false);
           setShowUnlockModal(false);
