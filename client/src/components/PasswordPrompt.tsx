@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import api from "../utils/api";
 import { useNavigate } from "react-router-dom";
 import "./PasswordPrompt.css";
@@ -16,6 +16,26 @@ export const PasswordPrompt: React.FC<PasswordPromptProps> = ({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keep focus on input after error
+  useEffect(() => {
+    if (error && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [error]);
+
+  // Close on Escape key (go back)
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !loading) {
+        navigate("/");
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +93,7 @@ export const PasswordPrompt: React.FC<PasswordPromptProps> = ({
         <form onSubmit={handleSubmit}>
           <div className="input-group">
             <input
+              ref={inputRef}
               type="password"
               placeholder="Password"
               value={password}
