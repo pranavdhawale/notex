@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import api from "../utils/api";
 import { toast } from "./Toaster";
+import { X } from "lucide-react";
 import "./LockUnlockModal.css";
 
 interface LockRoomModalProps {
@@ -20,6 +21,28 @@ export const LockRoomModal: React.FC<LockRoomModalProps> = ({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Focus input when modal opens or after error
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen, error]);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !loading) {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isOpen, loading, onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +90,7 @@ export const LockRoomModal: React.FC<LockRoomModalProps> = ({
         <div className="modal-header">
           <h3>🔒 Lock Room</h3>
           <button className="close-btn" onClick={onClose}>
-            ×
+            <X size={18} />
           </button>
         </div>
 
@@ -80,6 +103,7 @@ export const LockRoomModal: React.FC<LockRoomModalProps> = ({
           <div className="input-group">
             <label>New Password</label>
             <input
+              ref={inputRef}
               type="password"
               placeholder="Enter new password"
               value={newPassword}
@@ -147,6 +171,28 @@ export const UnlockRoomModal: React.FC<UnlockRoomModalProps> = ({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Focus input when modal opens or after error
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen, error]);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !loading) {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isOpen, loading, onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,7 +229,7 @@ export const UnlockRoomModal: React.FC<UnlockRoomModalProps> = ({
         <div className="modal-header">
           <h3>🔓 Unlock Room</h3>
           <button className="close-btn" onClick={onClose}>
-            ×
+            <X size={18} />
           </button>
         </div>
 
@@ -196,6 +242,7 @@ export const UnlockRoomModal: React.FC<UnlockRoomModalProps> = ({
           <div className="input-group">
             <label>Current Password</label>
             <input
+              ref={inputRef}
               type="password"
               placeholder="Enter password"
               value={password}

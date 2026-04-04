@@ -34,19 +34,24 @@
 }
 
 .close-btn {
-  background: none;
+  background: transparent;
   border: none;
   color: var(--text-secondary);
-  font-size: 1.5rem;
   cursor: pointer;
-  padding: 0;
-  line-height: 1;
+  padding: 6px;
   opacity: 0.7;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .close-btn:hover {
   opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .modal-description {
