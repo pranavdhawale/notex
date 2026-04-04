@@ -186,6 +186,9 @@ func DeleteRoom(c *gin.Context) {
 	// 4. Close WebSocket Connections
 	ws.MainHub.CloseRoom(slug)
 
+	// 5. Purge all auth tokens for this room
+	state.AuthTokens.DeleteAllForRoom(slug)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Room deleted"})
 }
 
