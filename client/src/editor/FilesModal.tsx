@@ -160,6 +160,9 @@ export const FilesModal: React.FC<FilesModalProps> = ({
               <div className="empty-state">
                 <Upload size={32} opacity={0.5} />
                 <p>No files yet</p>
+                <p style={{ fontSize: "0.75rem", opacity: 0.5, marginTop: "4px" }}>
+                  Max 10 uploads/min
+                </p>
               </div>
             ) : (
               files.map((f) => {
