@@ -43,6 +43,10 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 - **TTL Management**: Rooms auto-expire based on activity
   - Empty rooms: 24 hours
   - Rooms with content: 7 days
+- **Room Locking**: Password-protect rooms for restricted access
+  - Lock rooms with a password
+  - Unlock rooms by verifying password
+  - Single-use auth tokens for secure access
 
 ### 📁 File Sharing
 
@@ -56,6 +60,22 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 - **Auto-Recovery**: Recover work after page refresh
 - **Compression**: Efficient storage using pako compression
 - **Optimized Particles**: High-performance background effects powered by OGL, optimized for low resource usage.
+
+### ⌨️ Keyboard Shortcuts
+
+- **Quick Actions**: Comprehensive keyboard shortcuts for all editor operations
+- **Formatting**: Bold (Ctrl+B), Italic (Ctrl+I), Strikethrough, Underline (Ctrl+U)
+- **Headings**: Ctrl+Alt+1/2/3 for H1/H2/H3
+- **Lists**: Bullet list (Ctrl+Shift+8), Ordered list (Ctrl+Shift+7)
+- **Blocks**: Blockquote (Ctrl+Shift+B), Code block (Ctrl+Alt+C)
+- **Navigation**: Save (Ctrl+S), Lock/Unlock (Ctrl+L), Shortcuts help (Ctrl+/)
+
+### 🖱️ Table Editing
+
+- **Context Menu**: Right-click on tables for quick actions
+- **Column Operations**: Add before/after, delete columns
+- **Row Operations**: Add before/after, delete rows
+- **Table Management**: Delete entire tables
 
 ## 🛠️ The Tech Stack
 
@@ -72,7 +92,7 @@ Notex isn't just a toy; it's an architectural showcase.
 
 ### **Backend** (The Beast) 🦍
 
-- **Go (Golang) 1.23+**: Raw performance and first-class concurrency
+- **Go (Golang) 1.25+**: Raw performance and first-class concurrency
 - **Gin**: High-performance HTTP web framework
 - **WebSocket**: Native Go WebSocket for real-time communication
 - **MongoDB**: Stores room metadata, content, and application state
@@ -130,6 +150,8 @@ graph TD
 - **MinIO**: S3-compatible service for robust, scalable object & file storage
 - **WebSocket Hub**: Manages active connections and broadcasts updates
 - **Smart Cache**: Browser-based caching for resilience
+- **Token Store**: In-memory auth token management for locked room access
+- **Cleanup Service**: Routine cleanup of orphaned files and expired auth tokens
 
 ## 📁 Project Structure
 
@@ -141,9 +163,26 @@ notex/
 │   │   │   ├── Editor.tsx
 │   │   │   ├── Toolbar.tsx
 │   │   │   ├── FilesSidebar.tsx
-│   │   │   └── UsersSidebar.tsx
+│   │   │   ├── FilesModal.tsx
+│   │   │   └── TableContextMenu.tsx
 │   │   ├── components/    # Shared components
-│   │   ├── utils/         # Utilities (cache manager)
+│   │   │   ├── ActiveUsersAvatars.tsx
+│   │   │   ├── ConfirmationModal.tsx
+│   │   │   ├── KeyboardShortcutsPopup.tsx
+│   │   │   ├── LockUnlockModal.tsx
+│   │   │   ├── NotFoundView.tsx
+│   │   │   ├── Particles.tsx
+│   │   │   ├── PasswordPrompt.tsx
+│   │   │   ├── StartupAnimation.tsx
+│   │   │   ├── ThemeContext.tsx
+│   │   │   └── Toaster.tsx
+│   │   ├── utils/         # Utilities
+│   │   │   ├── api.ts
+│   │   │   ├── constants.ts
+│   │   │   ├── fileIcons.tsx
+│   │   │   ├── session.ts
+│   │   │   └── SmartCacheManager.ts
+│   │   ├── App.tsx
 │   │   └── LandingPage.tsx
 │   └── Dockerfile
 │
@@ -151,12 +190,19 @@ notex/
 │   ├── main.go
 │   ├── internal/
 │   │   ├── api/          # Protected HTTP handlers
+│   │   │   ├── handlers.go
+│   │   │   ├── upload.go
+│   │   │   └── roomlock.go
+│   │   ├── cleanup/      # Orphaned file cleanup
 │   │   ├── middleware/   # Security layer (Auth & Rate limits)
-│   │   ├── storage/      # MinIO client and file handling
-│   │   ├── ws/           # WebSocket hub & clients
 │   │   ├── models/       # Data models
-│   │   ├── state/        # DB & State connections
-│   │   └── utils/        # Utilities
+│   │   ├── state/       # DB & State connections
+│   │   │   ├── mongo.go
+│   │   │   ├── storage.go
+│   │   │   └── authtoken.go
+│   │   ├── storage/      # MinIO client and file handling
+│   │   ├── utils/        # Utilities
+│   │   └── ws/           # WebSocket hub & clients
 │   └── Dockerfile
 │
 └── docker-compose.dev.yml
