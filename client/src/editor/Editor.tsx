@@ -446,9 +446,14 @@ export const Editor: React.FC<EditorProps> = ({
 
   // Track if we're intentionally leaving (deleting room) to prevent false 404 errors
   const isLeavingRef = useRef(false);
+  // Track if we should skip saving cache on cleanup (intentional leave/delete)
+  const skipCacheSaveRef = useRef(false);
 
   const handleLeave = () => {
     isLeavingRef.current = true;
+    skipCacheSaveRef.current = true;
+    // Clear cache when intentionally leaving
+    cacheManager.remove(roomSlug);
     navigate("/");
   };
 
@@ -459,6 +464,7 @@ export const Editor: React.FC<EditorProps> = ({
       )
     ) {
       isLeavingRef.current = true; // Prevent false 404 error on disconnect
+      skipCacheSaveRef.current = true; // Skip cache save on cleanup
       try {
         await api.delete(`/api/rooms/${roomSlug}`);
 
@@ -750,8 +756,8 @@ export const Editor: React.FC<EditorProps> = ({
     return () => {
       clearTimeout(timeoutId);
       if (provider) {
-        // Save Yjs state before disconnecting
-        if (doc) {
+        // Save Yjs state before disconnecting (skip if intentionally leaving/deleting)
+        if (doc && !skipCacheSaveRef.current) {
           try {
             cacheManager.saveYjs(roomSlug, doc);
           } catch (e) {
