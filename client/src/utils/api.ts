@@ -26,14 +26,8 @@ api.interceptors.request.use(
 export default api;
 
 /**
- * Helper to get WebSocket URL with user ID and optional auth token
+ * Helper to get WebSocket base URL
  */
-export function getWebSocketUrl(roomSlug: string, authToken?: string): string {
-  const wsBase = API_URL.replace('http', 'ws');
-  const userID = getUserID();
-  let url = `${wsBase}/ws/${roomSlug}?userID=${encodeURIComponent(userID)}`;
-  if (authToken) {
-    url += `&authToken=${encodeURIComponent(authToken)}`;
-  }
-  return url;
+export function getWebSocketBaseUrl(): string {
+  return API_URL.replace('http', 'ws') + '/ws';
 }

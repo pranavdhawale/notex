@@ -23,7 +23,7 @@ import { FilesModal } from "./FilesModal";
 import { ActiveUsersAvatars } from "../components/ActiveUsersAvatars";
 import { Toolbar } from "./Toolbar";
 import { TableContextMenu } from "./TableContextMenu";
-import api, { getWebSocketUrl } from "../utils/api";
+import api, { getWebSocketBaseUrl } from "../utils/api";
 import { LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown, Key, Menu, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cacheManager } from "../utils/SmartCacheManager";
@@ -719,9 +719,15 @@ export const Editor: React.FC<EditorProps> = ({
       }
 
       // Create provider with connect: false to prevent early sync
-      const wsUrl = getWebSocketUrl(roomSlug, authToken);
+      const wsUrl = getWebSocketBaseUrl();
+      const params: Record<string, string> = { userID: userDetails.userId };
+      if (authToken) {
+        params.authToken = authToken;
+      }
+
       provider = new WebsocketProvider(wsUrl, roomSlug, doc, {
-        connect: false
+        connect: false,
+        params
       });
 
       provider.on("status", (event: any) => {
