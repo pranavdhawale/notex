@@ -233,6 +233,7 @@ const TiptapEditor = forwardRef<EditorRef, {
                   setTimeout(() => (el.style.opacity = "0"), 2000);
                 }
               }}
+              className="room-name"
               style={{
                 cursor: "pointer",
                 fontWeight: 600,
@@ -272,7 +273,7 @@ const TiptapEditor = forwardRef<EditorRef, {
             </span>
           </div>
 
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <div className="status-bar-right" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             <ActiveUsersAvatars provider={provider} />
 
             <div
@@ -348,13 +349,6 @@ const TiptapEditor = forwardRef<EditorRef, {
               ) : (
                 <Save size={20} />
               )}
-            </button>
-            <button
-              onClick={() => setShowFilesModal(true)}
-              className="btn-icon desktop-only-btn"
-              title="Files"
-            >
-              <File size={20} />
             </button>
           </div>
         </div>
