@@ -11,6 +11,11 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+.active-users-avatars:focus {
+  outline: 2px solid var(--color-primary, #007aff);
+  outline-offset: 2px;
+}
+
 .avatar-circle {
   width: 28px;
   height: 28px;
@@ -112,6 +117,7 @@
   gap: 8px;
   max-height: 300px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .users-list::-webkit-scrollbar {
@@ -160,6 +166,9 @@
   color: var(--text-main, #fff);
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .you-badge {

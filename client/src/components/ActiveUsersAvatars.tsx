@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { WebsocketProvider } from "y-websocket";
@@ -14,18 +14,27 @@ interface UserData {
   userId?: string;
 }
 
+interface AwarenessState {
+  user?: {
+    name: string;
+    color: string;
+    userId?: string;
+  };
+}
+
 export const ActiveUsersAvatars: React.FC<ActiveUsersAvatarsProps> = ({
   provider,
 }) => {
   const [users, setUsers] = useState<UserData[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const updateUsers = () => {
       const states = provider.awareness.getStates();
       const uniqueUsers = new Map<string, UserData>();
 
-      states.forEach((state: any) => {
+      states.forEach((state: AwarenessState) => {
         if (state.user && state.user.userId) {
           uniqueUsers.set(state.user.userId, state.user);
         } else if (state.user) {
@@ -52,6 +61,8 @@ export const ActiveUsersAvatars: React.FC<ActiveUsersAvatarsProps> = ({
 
     if (isOpen) {
       document.addEventListener("keydown", handleEscape);
+      // Focus the close button when modal opens
+      closeButtonRef.current?.focus();
     }
 
     return () => {
@@ -59,16 +70,35 @@ export const ActiveUsersAvatars: React.FC<ActiveUsersAvatarsProps> = ({
     };
   }, [isOpen]);
 
+  // Handle keyboard interaction on trigger
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setIsOpen(true);
+    }
+  };
+
   // Show max 2 avatars, then +count for remaining
   const displayUsers = users.slice(0, 2);
   const remainingCount = users.length - 2;
   const currentUserName = provider.awareness.getLocalState()?.user?.name;
+
+  // Don't render if no users
+  if (users.length === 0) {
+    return null;
+  }
 
   return (
     <>
       <div
         className="active-users-avatars"
         onClick={() => setIsOpen(true)}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+        role="button"
+        aria-label="View active users"
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
       >
         {displayUsers.map((u, i) => (
           <div
@@ -116,6 +146,7 @@ export const ActiveUsersAvatars: React.FC<ActiveUsersAvatarsProps> = ({
                 <span className="users-count">{users.length}</span>
               </h3>
               <button
+                ref={closeButtonRef}
                 type="button"
                 className="users-close"
                 onClick={() => setIsOpen(false)}
