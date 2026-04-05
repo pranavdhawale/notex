@@ -117,12 +117,17 @@
   padding: 0 20px;
   box-sizing: border-box;
   line-height: 1; /* prevent font leading issues */
-  overflow: hidden; /* Prevent horizontal scroll */
+  overflow: visible; /* Allow mobile menu dropdown to show */
   min-width: 0; /* Allow shrinking */
 }
 
 .status-bar-row > div {
   min-width: 0; /* Allow flex children to shrink */
+}
+
+/* Left side of status bar - prevent overflow */
+.status-bar-row > div:first-child {
+  overflow: hidden;
 }
 
 /* Room name text truncation */
@@ -923,6 +928,11 @@
     flex-shrink: 0; /* Prevent buttons from shrinking */
   }
 
+  /* Hide room name on mobile - shown in mobile menu instead */
+  .status-bar-row .room-name {
+    display: none !important;
+  }
+
   /* Hide formatting toolbar on mobile - keep only essential buttons */
   .editor-toolbar-simple {
     display: none !important;
@@ -977,7 +987,7 @@
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 12px;
+  padding: 10px 12px;
   background: transparent;
   border: none;
   border-radius: 8px;
@@ -988,8 +998,33 @@
   transition: background 0.15s ease;
 }
 
+.mobile-menu-item:not(:last-child) {
+  margin-bottom: 4px;
+}
+
 .mobile-menu-item:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* Room name item in mobile menu */
+.mobile-menu-room-name {
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.mobile-menu-room-name:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.mobile-menu-room-name span:not(#copy-feedback-mobile) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+#copy-feedback-mobile {
+  font-size: 11px;
 }
 
 /* Desktop buttons hidden on mobile */

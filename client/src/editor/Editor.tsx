@@ -24,7 +24,7 @@ import { ActiveUsersAvatars } from "../components/ActiveUsersAvatars";
 import { Toolbar } from "./Toolbar";
 import { TableContextMenu } from "./TableContextMenu";
 import api, { getWebSocketUrl } from "../utils/api";
-import { LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown, Key, Menu } from "lucide-react";
+import { LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown, Key, Menu, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cacheManager } from "../utils/SmartCacheManager";
 import { NotFoundView } from "../components/NotFoundView";
@@ -299,6 +299,34 @@ const TiptapEditor = forwardRef<EditorRef, {
                 <>
                   <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)} />
                   <div className="mobile-menu-dropdown">
+                    {/* Room name - clickable to copy link */}
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.href);
+                        const el = document.getElementById("copy-feedback-mobile");
+                        if (el) {
+                          el.style.opacity = "1";
+                          setTimeout(() => (el.style.opacity = "0"), 2000);
+                        }
+                      }}
+                      className="mobile-menu-item mobile-menu-room-name"
+                    >
+                      <MapPin size={18} style={{ color: "var(--color-error, #ff3b30)" }} />
+                      <span>{roomSlug}</span>
+                      <span
+                        id="copy-feedback-mobile"
+                        style={{
+                          opacity: 0,
+                          transition: "opacity 0.3s",
+                          color: "#4caf50",
+                          fontSize: "0.75rem",
+                          marginLeft: "auto",
+                        }}
+                      >
+                        Copied!
+                      </span>
+                    </button>
+
                     {isOwner && (
                       <button
                         onClick={() => {
