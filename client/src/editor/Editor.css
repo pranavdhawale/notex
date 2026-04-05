@@ -25,13 +25,13 @@
   isolation: isolate; /* Create new stacking context */
 }
 
-/* --- Right Panel (Files) --- */
-.right-panel {
+/* --- Left Panel (Files) --- */
+.left-panel {
   width: 260px;
   min-width: 260px;
 }
 
-.right-panel.dragging {
+.left-panel.dragging {
   background: rgba(0, 122, 255, 0.2);
   border-color: var(--color-primary);
 }
@@ -789,7 +789,7 @@
     gap: 12px;
   }
 
-  .right-panel {
+  .left-panel {
     width: 260px;
     min-width: 260px;
   }
@@ -812,7 +812,7 @@
     gap: 15px;
   }
 
-  .right-panel {
+  .left-panel {
     width: 260px;
     min-width: 260px;
   }
@@ -850,7 +850,7 @@
 
 /* Mobile-specific: Hide sidebars by default */
 @media (max-width: 767px) {
-  .right-panel {
+  .left-panel {
     display: none;
   }
 

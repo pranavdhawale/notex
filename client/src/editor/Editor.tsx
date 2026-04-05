@@ -763,6 +763,14 @@ export const Editor: React.FC<EditorProps> = ({
 
   return (
     <div className="editor-layout">
+      {/* LEFT: FILES */}
+      <FilesSidebar
+        roomSlug={roomSlug}
+        ydoc={ydoc}
+        userId={userId}
+        isRoomOwner={isOwner}
+      />
+
       {/* CENTER: EDITOR */}
       <div className="editor-main">
         <TiptapEditor
@@ -782,14 +790,6 @@ export const Editor: React.FC<EditorProps> = ({
           onUnlockRoom={() => setShowUnlockModal(true)}
         />
       </div>
-
-      {/* RIGHT: FILES */}
-      <FilesSidebar
-        roomSlug={roomSlug}
-        ydoc={ydoc}
-        userId={userId}
-        isRoomOwner={isOwner}
-      />
 
       {/* Mobile Files Modal */}
       <FilesModal

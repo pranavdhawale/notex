@@ -255,7 +255,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
 
   return (
     <div
-      className={`sidebar-panel right-panel ${isDragging ? "dragging" : ""}`}
+      className={`sidebar-panel left-panel ${isDragging ? "dragging" : ""}`}
       onDragOver={(e) => {
         e.preventDefault();
         setIsDragging(true);
