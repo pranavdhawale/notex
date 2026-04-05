@@ -67,7 +67,7 @@ export const ActiveUsersAvatars: React.FC<ActiveUsersAvatarsProps> = ({
   return (
     <>
       <div
-        className={`active-users-avatars${isOpen ? ' modal-open' : ''}`}
+        className="active-users-avatars"
         onClick={() => setIsOpen(true)}
       >
         {displayUsers.map((u, i) => (
