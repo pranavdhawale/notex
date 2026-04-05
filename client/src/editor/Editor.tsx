@@ -108,8 +108,6 @@ const TiptapEditor = forwardRef<EditorRef, {
       attributes: {
         class: "ProseMirror",
       },
-      scrollThreshold: { top: 80, bottom: 40, left: 0, right: 0 },
-      scrollMargin: { top: 80, bottom: 40, left: 0, right: 0 },
     },
     onUpdate: () => {
       // Yjs state is updated automatically via Collaboration extension
@@ -194,121 +192,122 @@ const TiptapEditor = forwardRef<EditorRef, {
         position: "relative",
       }}
     >
-      <div ref={scrollRef} style={{ flex: 1, overflow: "auto", position: "relative", scrollPaddingTop: "80px" }}>
-        {/* Unified Sticky Header */}
-        <div className="sticky-header-glass">
-          {/* Single Liquid Glass Background */}
-          <div className="liquid-glass-container">
-            <div className="liquid-glass-backdrop"></div>
-            <div className="liquid-glass-distortion top"></div>
-            <div className="liquid-glass-distortion bottom"></div>
-            <div className="liquid-glass-distortion left"></div>
-            <div className="liquid-glass-distortion right"></div>
-          </div>
-
-          <div className="status-bar-row">
-            <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
-              <span
-                className={`status-dot ${status === "connected" ? "online" : "offline"}`}
-              ></span>
-              <span
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                  const el = document.getElementById("copy-feedback");
-                  if (el) {
-                    el.style.opacity = "1";
-                    setTimeout(() => (el.style.opacity = "0"), 2000);
-                  }
-                }}
-                style={{
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  color: "var(--text-main)",
-                }}
-                title="Click to copy room link"
-              >
-                Room: {roomSlug}
-              </span>
-              <button
-                onClick={handleLeave}
-                className="btn-icon"
-                title="Leave Room"
-              >
-                <LogOut size={20} />
-              </button>
-              {isOwner && (
-                <button
-                  onClick={handleDeleteRoom}
-                  className="btn-icon delete"
-                  title="Delete Room"
-                  style={{ color: "#ff4d4f" }}
-                >
-                  <Trash size={20} />
-                </button>
-              )}
-              <span
-                id="copy-feedback"
-                style={{
-                  opacity: 0,
-                  transition: "opacity 0.3s",
-                  color: "#4caf50",
-                  fontSize: "0.8em",
-                }}
-              >
-                Copied!
-              </span>
-            </div>
-
-            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-              <ActiveUsersAvatars provider={provider} />
-
-              <div
-                style={{
-                  width: 1,
-                  background: "rgba(255,255,255,0.1)",
-                  height: "24px",
-                  margin: "0 5px",
-                }}
-              ></div>
-
-              {isOwner && (
-                <button
-                  onClick={roomLocked ? onUnlockRoom : onLockRoom}
-                  className="btn-icon"
-                  style={{ color: roomLocked ? "var(--color-primary)" : "var(--text-secondary)" }}
-                  title={roomLocked ? "Unlock Room" : "Lock Room"}
-                >
-                  <Key size={18} />
-                </button>
-              )}
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="btn-icon"
-                style={{ color: "var(--color-primary)" }}
-                title={saving ? "Saving..." : "Save Snapshot"}
-              >
-                {saving ? (
-                  <Loader2 size={20} className="animate-spin" />
-                ) : (
-                  <Save size={20} />
-                )}
-              </button>
-              <button
-                onClick={() => setShowFilesModal(true)}
-                className="btn-icon btn-files-mobile"
-                title="Files"
-              >
-                <File size={20} />
-              </button>
-            </div>
-          </div>
-
-          <Toolbar editor={editor} />
+      {/* Fixed Header - Outside scroll container */}
+      <div className="sticky-header-glass">
+        {/* Single Liquid Glass Background */}
+        <div className="liquid-glass-container">
+          <div className="liquid-glass-backdrop"></div>
+          <div className="liquid-glass-distortion top"></div>
+          <div className="liquid-glass-distortion bottom"></div>
+          <div className="liquid-glass-distortion left"></div>
+          <div className="liquid-glass-distortion right"></div>
         </div>
 
-        <TableContextMenu 
-          editor={editor} 
+        <div className="status-bar-row">
+          <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
+            <span
+              className={`status-dot ${status === "connected" ? "online" : "offline"}`}
+            ></span>
+            <span
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                const el = document.getElementById("copy-feedback");
+                if (el) {
+                  el.style.opacity = "1";
+                  setTimeout(() => (el.style.opacity = "0"), 2000);
+                }
+              }}
+              style={{
+                cursor: "pointer",
+                fontWeight: 600,
+                color: "var(--text-main)",
+              }}
+              title="Click to copy room link"
+            >
+              Room: {roomSlug}
+            </span>
+            <button
+              onClick={handleLeave}
+              className="btn-icon"
+              title="Leave Room"
+            >
+              <LogOut size={20} />
+            </button>
+            {isOwner && (
+              <button
+                onClick={handleDeleteRoom}
+                className="btn-icon delete"
+                title="Delete Room"
+                style={{ color: "#ff4d4f" }}
+              >
+                <Trash size={20} />
+              </button>
+            )}
+            <span
+              id="copy-feedback"
+              style={{
+                opacity: 0,
+                transition: "opacity 0.3s",
+                color: "#4caf50",
+                fontSize: "0.8em",
+              }}
+            >
+              Copied!
+            </span>
+          </div>
+
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <ActiveUsersAvatars provider={provider} />
+
+            <div
+              style={{
+                width: 1,
+                background: "rgba(255,255,255,0.1)",
+                height: "24px",
+                margin: "0 5px",
+              }}
+            ></div>
+
+            {isOwner && (
+              <button
+                onClick={roomLocked ? onUnlockRoom : onLockRoom}
+                className="btn-icon"
+                style={{ color: roomLocked ? "var(--color-primary)" : "var(--text-secondary)" }}
+                title={roomLocked ? "Unlock Room" : "Lock Room"}
+              >
+                <Key size={18} />
+              </button>
+            )}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="btn-icon"
+              style={{ color: "var(--color-primary)" }}
+              title={saving ? "Saving..." : "Save Snapshot"}
+            >
+              {saving ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <Save size={20} />
+              )}
+            </button>
+            <button
+              onClick={() => setShowFilesModal(true)}
+              className="btn-icon btn-files-mobile"
+              title="Files"
+            >
+              <File size={20} />
+            </button>
+          </div>
+        </div>
+
+        <Toolbar editor={editor} />
+      </div>
+
+      {/* Scrollable Content Area */}
+      <div ref={scrollRef} style={{ flex: 1, overflow: "auto", position: "relative" }}>
+        <TableContextMenu
+          editor={editor}
           isOpen={menuState.isOpen}
           x={menuState.x}
           y={menuState.y}

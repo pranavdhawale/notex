@@ -93,10 +93,10 @@
   position: relative;
 }
 
-/* Unified Sticky Header */
+/* Unified Header - Fixed at top, content scrolls below */
 .sticky-header-glass {
-  position: sticky;
-  top: 0;
+  position: relative;
+  flex-shrink: 0;
   z-index: 50;
   /* background managed by liquid-glass-container */
 }
