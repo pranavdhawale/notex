@@ -58,7 +58,8 @@ body {
   display: flex;
   place-items: center;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: 100vh; /* Fallback for older browsers */
+  min-height: 100dvh; /* Dynamic viewport height - accounts for mobile browser UI */
   background: var(--bg-gradient);
   background: var(--bg-gradient);
   overflow: hidden;

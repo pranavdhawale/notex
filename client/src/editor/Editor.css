@@ -1,10 +1,12 @@
 .editor-layout {
   display: flex;
-  height: 100vh;
+  height: 100vh; /* Fallback for older browsers */
+  height: 100dvh; /* Dynamic viewport height - accounts for mobile browser UI */
   width: 100vw;
   background: transparent; /* Handled by global body bg */
   overflow: hidden;
   padding: 15px; /* Spacing for floating look */
+  padding-top: calc(15px + env(safe-area-inset-top)); /* Account for iOS notch/Dynamic Island */
   gap: 15px;
   box-sizing: border-box;
 }
@@ -93,9 +95,10 @@
   position: relative;
 }
 
-/* Unified Header - Fixed at top, content scrolls below */
+/* Unified Header - Sticky at top, content scrolls below */
 .sticky-header-glass {
-  position: relative;
+  position: sticky;
+  top: 0;
   flex-shrink: 0;
   z-index: 50;
   /* background managed by liquid-glass-container */
@@ -114,6 +117,33 @@
   padding: 0 20px;
   box-sizing: border-box;
   line-height: 1; /* prevent font leading issues */
+  overflow: hidden; /* Prevent horizontal scroll */
+  min-width: 0; /* Allow shrinking */
+}
+
+.status-bar-row > div {
+  min-width: 0; /* Allow flex children to shrink */
+}
+
+/* Room name text truncation */
+.status-bar-row .room-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Right side of status bar */
+.status-bar-right {
+  flex-shrink: 0; /* Prevent right side from shrinking */
+}
+
+/* Mobile adjustments */
+@media (max-width: 767px) {
+  .status-bar-right {
+    gap: 6px !important; /* Reduce gap on mobile */
+  }
 }
 
 .status-bar-row .btn-icon {
@@ -192,6 +222,7 @@
 .scroll-nav-group {
   position: absolute;
   bottom: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom)); /* Account for iOS home indicator */
   right: 20px;
   display: flex;
   flex-direction: column;
@@ -624,6 +655,8 @@
   gap: 12px;
   flex-wrap: wrap;
   background: transparent;
+  overflow: hidden; /* Prevent horizontal scroll */
+  min-width: 0; /* Allow shrinking */
 }
 
 /* Liquid Glass Effect Classes */
@@ -856,6 +889,8 @@
 
   .editor-layout {
     padding: 5px;
+    padding-top: calc(5px + env(safe-area-inset-top));
+    padding-bottom: calc(5px + env(safe-area-inset-bottom));
     gap: 0;
   }
 
@@ -875,11 +910,17 @@
     gap: 8px;
     display: flex;
     align-items: center;
+    flex-wrap: nowrap; /* Prevent wrapping */
+  }
+
+  .status-bar-row .room-name {
+    max-width: 120px; /* Limit room name width on mobile */
   }
 
   .status-bar-row .btn-icon {
     width: 36px !important;
     height: 36px !important;
+    flex-shrink: 0; /* Prevent buttons from shrinking */
   }
 
   /* Hide formatting toolbar on mobile - keep only essential buttons */
