@@ -19,12 +19,12 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import "./Editor.css";
 import { FilesSidebar } from "./FilesSidebar";
-import { UsersSidebar } from "./UsersSidebar";
 import { FilesModal } from "./FilesModal";
+import { ActiveUsersAvatars } from "../components/ActiveUsersAvatars";
 import { Toolbar } from "./Toolbar";
 import { TableContextMenu } from "./TableContextMenu";
 import api, { getWebSocketUrl } from "../utils/api";
-import { Users, LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown, Key } from "lucide-react";
+import { LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown, Key } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cacheManager } from "../utils/SmartCacheManager";
 import { NotFoundView } from "../components/NotFoundView";
@@ -55,8 +55,6 @@ const TiptapEditor = forwardRef<EditorRef, {
   isOwner: boolean;
   roomLocked: boolean;
   saving: boolean;
-  showUsers: boolean;
-  setShowUsers: (show: boolean) => void;
   setShowFilesModal: (show: boolean) => void;
   handleLeave: () => void;
   handleDeleteRoom: () => void;
@@ -71,8 +69,6 @@ const TiptapEditor = forwardRef<EditorRef, {
   isOwner,
   roomLocked,
   saving,
-  showUsers,
-  setShowUsers,
   setShowFilesModal,
   handleLeave,
   handleDeleteRoom,
@@ -264,6 +260,17 @@ const TiptapEditor = forwardRef<EditorRef, {
             </div>
 
             <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <ActiveUsersAvatars provider={provider} />
+
+              <div
+                style={{
+                  width: 1,
+                  background: "rgba(255,255,255,0.1)",
+                  height: "24px",
+                  margin: "0 5px",
+                }}
+              ></div>
+
               {isOwner && (
                 <button
                   onClick={roomLocked ? onUnlockRoom : onLockRoom}
@@ -287,27 +294,12 @@ const TiptapEditor = forwardRef<EditorRef, {
                   <Save size={20} />
                 )}
               </button>
-              <div
-                style={{
-                  width: 1,
-                  background: "rgba(255,255,255,0.1)",
-                  height: "24px",
-                  margin: "0 5px",
-                }}
-              ></div>
               <button
                 onClick={() => setShowFilesModal(true)}
                 className="btn-icon btn-files-mobile"
                 title="Files"
               >
                 <File size={20} />
-              </button>
-              <button
-                onClick={() => setShowUsers(!showUsers)}
-                className="btn-icon btn-users"
-                title="Toggle Users"
-              >
-                <Users size={20} />
               </button>
             </div>
           </div>
@@ -364,10 +356,6 @@ export const Editor: React.FC<EditorProps> = ({
   const [showLockModal, setShowLockModal] = useState(false);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [showUsers, setShowUsers] = useState(() => {
-    const saved = localStorage.getItem("notex_show_users");
-    return saved === null ? true : saved === "true";
-  });
   const [showFilesModal, setShowFilesModal] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [files, setFiles] = useState<any[]>([]);
@@ -520,10 +508,6 @@ export const Editor: React.FC<EditorProps> = ({
       color: color,
     };
   });
-
-  useEffect(() => {
-    localStorage.setItem("notex_show_users", String(showUsers));
-  }, [showUsers]);
 
   // Save Yjs state to cache on updates (debounced)
   useEffect(() => {
@@ -779,14 +763,6 @@ export const Editor: React.FC<EditorProps> = ({
 
   return (
     <div className="editor-layout">
-      {/* LEFT SIDEBAR: FILES */}
-      <FilesSidebar
-        roomSlug={roomSlug}
-        ydoc={ydoc}
-        userId={userId}
-        isRoomOwner={isOwner}
-      />
-
       {/* CENTER: EDITOR */}
       <div className="editor-main">
         <TiptapEditor
@@ -798,8 +774,6 @@ export const Editor: React.FC<EditorProps> = ({
           isOwner={isOwner}
           roomLocked={roomLocked}
           saving={saving}
-          showUsers={showUsers}
-          setShowUsers={setShowUsers}
           setShowFilesModal={setShowFilesModal}
           handleLeave={handleLeave}
           handleDeleteRoom={handleDeleteRoom}
@@ -809,14 +783,12 @@ export const Editor: React.FC<EditorProps> = ({
         />
       </div>
 
-      {/* RIGHT: USERS */}
-      <UsersSidebar
-        provider={provider}
-        isOpen={showUsers}
-        onClose={() => {
-          setShowUsers(false);
-          editorRef.current?.focus();
-        }}
+      {/* RIGHT: FILES */}
+      <FilesSidebar
+        roomSlug={roomSlug}
+        ydoc={ydoc}
+        userId={userId}
+        isRoomOwner={isOwner}
       />
 
       {/* Mobile Files Modal */}
