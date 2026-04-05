@@ -12,6 +12,13 @@
   animation: fadeIn 0.2s ease-out;
 }
 
+/* Hide on desktop - show only on mobile */
+@media (min-width: 768px) {
+  .files-modal-overlay {
+    display: none !important;
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

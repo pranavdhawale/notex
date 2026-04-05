@@ -24,7 +24,7 @@ import { ActiveUsersAvatars } from "../components/ActiveUsersAvatars";
 import { Toolbar } from "./Toolbar";
 import { TableContextMenu } from "./TableContextMenu";
 import api, { getWebSocketUrl } from "../utils/api";
-import { LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown, Key } from "lucide-react";
+import { LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown, Key, Menu, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cacheManager } from "../utils/SmartCacheManager";
 import { NotFoundView } from "../components/NotFoundView";
@@ -77,6 +77,7 @@ const TiptapEditor = forwardRef<EditorRef, {
   onUnlockRoom,
 }, ref) => {
   const [menuState, setMenuState] = useState({ isOpen: false, x: 0, y: 0 });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const scrollHideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -146,6 +147,21 @@ const TiptapEditor = forwardRef<EditorRef, {
       if (scrollHideTimer.current) clearTimeout(scrollHideTimer.current);
     };
   }, []);
+
+  // Close mobile menu on Escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileMenuOpen(false);
+    };
+
+    if (mobileMenuOpen) {
+      document.addEventListener("keydown", handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [mobileMenuOpen]);
 
   const scrollToTop = () =>
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -217,6 +233,7 @@ const TiptapEditor = forwardRef<EditorRef, {
                   setTimeout(() => (el.style.opacity = "0"), 2000);
                 }
               }}
+              className="room-name"
               style={{
                 cursor: "pointer",
                 fontWeight: 600,
@@ -256,10 +273,11 @@ const TiptapEditor = forwardRef<EditorRef, {
             </span>
           </div>
 
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <div className="status-bar-right" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             <ActiveUsersAvatars provider={provider} />
 
             <div
+              className="header-separator"
               style={{
                 width: 1,
                 background: "rgba(255,255,255,0.1)",
@@ -268,10 +286,79 @@ const TiptapEditor = forwardRef<EditorRef, {
               }}
             ></div>
 
+            {/* Mobile menu button - visible only on mobile */}
+            <div className="mobile-menu-container">
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="btn-icon mobile-menu-btn"
+                title="Menu"
+              >
+                <Menu size={20} />
+              </button>
+              {mobileMenuOpen && (
+                <>
+                  <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)} />
+                  <div className="mobile-menu-dropdown">
+                    {/* Room name - clickable to copy link */}
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.href);
+                        const el = document.getElementById("copy-feedback-mobile");
+                        if (el) {
+                          el.style.opacity = "1";
+                          setTimeout(() => (el.style.opacity = "0"), 2000);
+                        }
+                      }}
+                      className="mobile-menu-item mobile-menu-room-name"
+                    >
+                      <MapPin size={18} style={{ color: "var(--color-error, #ff3b30)" }} />
+                      <span>{roomSlug}</span>
+                      <span
+                        id="copy-feedback-mobile"
+                        style={{
+                          opacity: 0,
+                          transition: "opacity 0.3s",
+                          color: "#4caf50",
+                          fontSize: "0.75rem",
+                          marginLeft: "auto",
+                        }}
+                      >
+                        Copied!
+                      </span>
+                    </button>
+
+                    {isOwner && (
+                      <button
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          roomLocked ? onUnlockRoom() : onLockRoom();
+                        }}
+                        className="mobile-menu-item"
+                      >
+                        <Key size={18} style={{ color: roomLocked ? "var(--color-primary)" : "inherit" }} />
+                        <span>{roomLocked ? "Unlock Room" : "Lock Room"}</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        setShowFilesModal(true);
+                      }}
+                      className="mobile-menu-item"
+                    >
+                      <File size={18} />
+                      <span>Files</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Desktop buttons - hidden on mobile */}
             {isOwner && (
               <button
                 onClick={roomLocked ? onUnlockRoom : onLockRoom}
-                className="btn-icon"
+                className="btn-icon desktop-only-btn"
                 style={{ color: roomLocked ? "var(--color-primary)" : "var(--text-secondary)" }}
                 title={roomLocked ? "Unlock Room" : "Lock Room"}
               >
@@ -290,13 +377,6 @@ const TiptapEditor = forwardRef<EditorRef, {
               ) : (
                 <Save size={20} />
               )}
-            </button>
-            <button
-              onClick={() => setShowFilesModal(true)}
-              className="btn-icon btn-files-mobile"
-              title="Files"
-            >
-              <File size={20} />
             </button>
           </div>
         </div>

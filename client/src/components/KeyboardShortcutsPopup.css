@@ -104,3 +104,11 @@
   background: transparent;
   border-color: transparent;
 }
+
+/* Hide on mobile devices */
+@media (max-width: 767px) {
+  .shortcuts-backdrop,
+  .shortcuts-popup {
+    display: none !important;
+  }
+}

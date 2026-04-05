@@ -175,3 +175,21 @@
   flex-shrink: 0;
   margin-left: 8px;
 }
+
+/* Hide on mobile devices */
+@media (max-width: 767px) {
+  .active-users-avatars {
+    display: none !important;
+  }
+
+  /* Hide the separator that comes after the avatar component */
+  .header-separator {
+    display: none !important;
+  }
+
+  /* Hide the users popup modal on mobile */
+  .users-backdrop,
+  .users-popup {
+    display: none !important;
+  }
+}
