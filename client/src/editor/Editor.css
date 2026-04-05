@@ -25,30 +25,15 @@
   isolation: isolate; /* Create new stacking context */
 }
 
-/* --- Left Panel (Files) --- */
-.left-panel {
+/* --- Right Panel (Files) --- */
+.right-panel {
   width: 260px;
   min-width: 260px;
 }
 
-.left-panel.dragging {
+.right-panel.dragging {
   background: rgba(0, 122, 255, 0.2);
   border-color: var(--color-primary);
-}
-
-/* --- Right Panel (Users) --- */
-.right-panel {
-  width: 240px;
-  min-width: 240px;
-}
-
-.right-panel.closed {
-  width: 0;
-  min-width: 0;
-  padding: 0;
-  opacity: 0;
-  border: none;
-  margin-right: -15px; /* Pull off screen slightly */
 }
 
 /* --- Headers --- */
@@ -628,74 +613,6 @@
   border: 1px solid rgba(255, 59, 48, 0.3);
 }
 
-/* --- Users Styling --- */
-.user-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
-  /* Push content down by header height + spacing */
-  padding-top: 70px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.user-list::-webkit-scrollbar {
-  width: 0;
-  background: transparent;
-}
-
-.user-card {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 12px;
-  padding: 8px;
-  background: var(--glass-item-bg);
-  border-radius: 12px;
-}
-
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-weight: bold;
-  font-size: 0.9rem;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-.user-details {
-  display: flex;
-  flex-direction: column;
-}
-
-.user-name {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-main);
-}
-
-.user-status {
-  font-size: 0.75rem;
-  color: var(--color-success);
-  display: flex;
-  align-items: center;
-}
-
-.user-status::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  background: var(--color-success);
-  border-radius: 50%;
-  margin-right: 4px;
-}
-
 /* --- Toolbar (Circular) --- */
 .editor-toolbar-simple {
   position: relative;
@@ -872,14 +789,9 @@
     gap: 12px;
   }
 
-  .left-panel {
-    width: 220px;
-    min-width: 220px;
-  }
-
   .right-panel {
-    width: 200px;
-    min-width: 200px;
+    width: 260px;
+    min-width: 260px;
   }
 
   .ProseMirror {
@@ -900,14 +812,9 @@
     gap: 15px;
   }
 
-  .left-panel {
+  .right-panel {
     width: 260px;
     min-width: 260px;
-  }
-
-  .right-panel {
-    width: 240px;
-    min-width: 240px;
   }
 
   .ProseMirror {
@@ -943,7 +850,6 @@
 
 /* Mobile-specific: Hide sidebars by default */
 @media (max-width: 767px) {
-  .left-panel,
   .right-panel {
     display: none;
   }
@@ -987,17 +893,9 @@
   display: none !important;
 }
 
-.btn-icon.btn-users {
-  display: flex !important;
-}
-
 /* Mobile overrides (applied last, wins due to media query specificity) */
 @media (max-width: 767px) {
   .btn-icon.btn-files-mobile {
     display: flex !important;
-  }
-
-  .btn-icon.btn-users {
-    display: none !important;
   }
 }
