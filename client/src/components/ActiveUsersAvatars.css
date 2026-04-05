@@ -186,4 +186,10 @@
   .header-separator {
     display: none !important;
   }
+
+  /* Hide the users popup modal on mobile */
+  .users-backdrop,
+  .users-popup {
+    display: none !important;
+  }
 }
