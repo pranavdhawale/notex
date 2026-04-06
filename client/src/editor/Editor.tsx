@@ -385,7 +385,20 @@ const TiptapEditor = forwardRef<EditorRef, {
       </div>
 
       {/* Scrollable Content Area */}
-      <div ref={scrollRef} style={{ flex: 1, overflow: "auto", position: "relative" }}>
+      <div
+        ref={scrollRef}
+        style={{ flex: 1, overflow: "auto", position: "relative" }}
+        onClick={(e) => {
+          // Check if click is outside ProseMirror content
+          const target = e.target as HTMLElement;
+          const isInsideEditor = target.closest('.ProseMirror') !== null;
+
+          if (!isInsideEditor && editor) {
+            // Click on empty space - focus editor and move cursor to end
+            editor.commands.focus('end');
+          }
+        }}
+      >
         <TableContextMenu
           editor={editor}
           isOpen={menuState.isOpen}
@@ -860,6 +873,7 @@ export const Editor: React.FC<EditorProps> = ({
         ydoc={ydoc}
         userId={userId}
         isRoomOwner={isOwner}
+        onFocusRestore={() => editorRef.current?.focus()}
       />
 
       {/* CENTER: EDITOR */}
