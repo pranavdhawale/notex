@@ -21,6 +21,7 @@ interface FilesSidebarProps {
   ydoc: Y.Doc;
   userId: string;
   isRoomOwner: boolean;
+  onFocusRestore?: () => void;
 }
 
 interface FileData {
@@ -45,6 +46,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
   ydoc,
   userId,
   isRoomOwner,
+  onFocusRestore,
 }) => {
   const [files, setFiles] = useState<FileData[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -73,6 +75,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       toast.error("Failed to download file");
     } finally {
       setDownloadingFileId(null);
+      onFocusRestore?.();
     }
   };
 
@@ -110,6 +113,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
     } catch (e) {
       toast.error("Failed to delete file");
     }
+    onFocusRestore?.();
   };
 
   const [showDeleteSelection, setShowDeleteSelection] = useState(false);
@@ -145,6 +149,8 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       console.error(e);
       toast.error("Failed to delete files");
     }
+    setShowDeleteConfirmation(false);
+    onFocusRestore?.();
   };
 
   const cancelUpload = (uploadId: string) => {
@@ -256,6 +262,10 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
   return (
     <div
       className={`sidebar-panel left-panel ${isDragging ? "dragging" : ""}`}
+      onMouseDown={(e) => {
+        // Prevent focus from leaving editor when clicking sidebar
+        e.preventDefault();
+      }}
       onDragOver={(e) => {
         e.preventDefault();
         setIsDragging(true);
