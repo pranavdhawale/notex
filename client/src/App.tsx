@@ -203,7 +203,7 @@ const EditorRoute = () => {
 };
 
 import { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeContext";
 import Particles from "./components/Particles";
 import { Toaster } from "./components/Toaster";
@@ -216,7 +216,7 @@ const GlobalParticles = () => {
       particleColors={[particleColor, particleColor]}
       particleCount={500}
       particleSpread={10}
-      speed={0}
+      speed={0.1}
       particleBaseSize={120}
       moveParticlesOnHover={false}
       alphaParticles={false}
@@ -227,16 +227,28 @@ const GlobalParticles = () => {
   );
 };
 
+// Must be inside <BrowserRouter> to use useLocation
+const AppContent = () => {
+  const location = useLocation();
+  const isLanding = location.pathname === "/" || location.pathname === "";
+
+  return (
+    <>
+      {isLanding && <GlobalParticles />}
+      <Toaster />
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/:roomSlug" element={<EditorRoute />} />
+      </Routes>
+    </>
+  );
+};
+
 function App() {
   return (
     <ThemeProvider>
-      <GlobalParticles />
-      <Toaster />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/:roomSlug" element={<EditorRoute />} />
-        </Routes>
+        <AppContent />
       </BrowserRouter>
     </ThemeProvider>
   );
