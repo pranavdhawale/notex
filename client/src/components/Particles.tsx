@@ -157,15 +157,6 @@ const Particles: React.FC<ParticlesProps> = ({
       camera.perspective({ aspect: gl.canvas.width / gl.canvas.height });
     };
 
-    // Debounce resize
-    let resizeTimeout: ReturnType<typeof setTimeout>;
-    const onResize = () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(resize, 200);
-    };
-    window.addEventListener("resize", onResize, false);
-    resize();
-
     const handleMouseMove = (e: MouseEvent) => {
       const rect = container.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -229,6 +220,13 @@ const Particles: React.FC<ParticlesProps> = ({
     let elapsed = 0;
     let isVisible = true;
 
+    // If nothing will change visually, render once and stop
+    const isStatic = speed === 0 && disableRotation;
+
+    const renderOnce = () => {
+      renderer.render({ scene: particles, camera });
+    };
+
     const update = (t: number) => {
       if (!isVisible) return;
 
@@ -256,23 +254,63 @@ const Particles: React.FC<ParticlesProps> = ({
       renderer.render({ scene: particles, camera });
     };
 
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        isVisible = false;
-        cancelAnimationFrame(animationFrameId);
+    // Start the appropriate render mode
+    const startRendering = () => {
+      isVisible = true;
+      lastTime = performance.now();
+      if (isStatic) {
+        renderOnce();
       } else {
-        isVisible = true;
-        lastTime = performance.now();
-        update(performance.now());
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(update);
       }
     };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    animationFrameId = requestAnimationFrame(update);
+    const stopRendering = () => {
+      isVisible = false;
+      cancelAnimationFrame(animationFrameId);
+    };
+
+    const handleVisibilityChange = () => {
+      document.hidden ? stopRendering() : startRendering();
+    };
+
+    // Pause when window loses focus (catches Mission Control / Alt-Tab)
+    // document.hidden stays false during Mission Control, but blur fires
+    const handleWindowBlur = () => stopRendering();
+    const handleWindowFocus = () => {
+      if (!document.hidden) startRendering();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
+
+    // Initial setup: resize first to set canvas dimensions, then render
+    resize();
+    if (isStatic) {
+      renderOnce();
+    } else {
+      animationFrameId = requestAnimationFrame(update);
+    }
+
+    // Debounce resize — must re-render for static mode since there's no rAF loop
+    let resizeTimeout: ReturnType<typeof setTimeout>;
+    const onResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        resize();
+        if (isStatic && isVisible) renderOnce();
+      }, 200);
+    };
+    window.addEventListener("resize", onResize, false);
 
     return () => {
       window.removeEventListener("resize", onResize);
+      clearTimeout(resizeTimeout);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
       if (moveParticlesOnHover) {
         window.removeEventListener("mousemove", handleMouseMove);
       }
