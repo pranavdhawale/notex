@@ -3,10 +3,13 @@ import { getUserID } from './session';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
-// Create axios instance
+// Default timeout for regular API requests (30 seconds)
+const DEFAULT_TIMEOUT = 30000;
+
+// Create axios instance with reasonable default timeout
 const api: AxiosInstance = axios.create({
   baseURL: API_URL,
-  timeout: 120000, // 2 minutes for large file uploads
+  timeout: DEFAULT_TIMEOUT,
 });
 
 // Request interceptor to add user ID header

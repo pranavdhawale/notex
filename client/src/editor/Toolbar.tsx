@@ -1,25 +1,25 @@
-import React from "react";
+import React, { memo } from "react";
 import { Editor } from "@tiptap/react";
-import { 
-  Bold, 
-  Italic, 
-  Strikethrough, 
-  Underline as UnderlineIcon, 
-  Highlighter, 
-  Heading1, 
-  Heading2, 
-  Heading3, 
-  List, 
-  ListOrdered, 
-  CheckSquare, 
-  Quote, 
-  TerminalSquare, 
-  Minus, 
-  AlignLeft, 
-  AlignCenter, 
-  AlignRight, 
-  AlignJustify, 
-  Link, 
+import {
+  Bold,
+  Italic,
+  Strikethrough,
+  Underline as UnderlineIcon,
+  Highlighter,
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  CheckSquare,
+  Quote,
+  TerminalSquare,
+  Minus,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  Link,
   Table as TableIcon
 } from "lucide-react";
 
@@ -27,7 +27,7 @@ interface ToolbarProps {
   editor: Editor | null;
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ editor }) => {
+const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
   if (!editor) {
     return null;
   }
@@ -223,3 +223,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editor }) => {
     </div>
   );
 };
+
+// Memoize to prevent re-renders on every keystroke in the editor
+export const Toolbar = memo(ToolbarComponent);

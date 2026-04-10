@@ -20,11 +20,14 @@ const EditorRoute = () => {
   // Fetch room details including lock status
   useEffect(() => {
     if (roomSlug) {
+      const controller = new AbortController();
+
       const userID = getUserID();
       fetch(
         `${
           import.meta.env.VITE_API_URL || "http://localhost:8080"
-        }/api/rooms/${roomSlug}`
+        }/api/rooms/${roomSlug}`,
+        { signal: controller.signal }
       )
         .then((res) => {
           if (!res.ok) {
@@ -44,9 +47,13 @@ const EditorRoute = () => {
           setRoomChecked(true);
         })
         .catch((err) => {
+          // Ignore cancellation errors
+          if (err.name === 'AbortError') return;
           console.error("Failed to fetch room details", err);
           setRoomChecked(true);
         });
+
+      return () => controller.abort();
     }
   }, [roomSlug]);
 
