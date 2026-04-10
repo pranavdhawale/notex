@@ -52,7 +52,12 @@ export class SmartCacheManager {
       // Compress string data using gzip
       const compressed = pako.deflate(content);
       // Convert Uint8Array to base64 string for storage
-      const base64 = btoa(String.fromCharCode(...compressed));
+      // Use loop instead of spread to avoid stack overflow on large documents
+      let binary = '';
+      for (let i = 0; i < compressed.length; i++) {
+        binary += String.fromCharCode(compressed[i]);
+      }
+      const base64 = btoa(binary);
 
       const entry: CacheEntry = {
         data: base64,
@@ -123,7 +128,12 @@ export class SmartCacheManager {
   saveYjs(roomSlug: string, doc: Y.Doc): void {
     try {
       const update = Y.encodeStateAsUpdate(doc);
-      const base64 = btoa(String.fromCharCode(...update));
+      // Use loop instead of spread to avoid stack overflow on large documents
+      let binary = '';
+      for (let i = 0; i < update.length; i++) {
+        binary += String.fromCharCode(update[i]);
+      }
+      const base64 = btoa(binary);
       sessionStorage.setItem(`${this.yjsPrefix}${roomSlug}`, base64);
     } catch (e: any) {
       if (e.name === "QuotaExceededError" || e.code === 22) {
