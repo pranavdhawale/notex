@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -143,15 +144,53 @@ func UploadFile(c *gin.Context) {
 	c.JSON(http.StatusCreated, fileRecord)
 }
 
-// ListFiles returns all files for a room
+const (
+	DefaultPageSize = 50
+	MaxPageSize     = 100
+)
+
+// ListFiles returns files for a room with pagination support
 func ListFiles(c *gin.Context) {
 	roomID := c.Param("room")
+
+	// Parse pagination parameters
+	limit := DefaultPageSize
+	offset := 0
+
+	if l := c.Query("limit"); l != "" {
+		if parsedLimit, err := strconv.Atoi(l); err == nil && parsedLimit > 0 {
+			if parsedLimit > MaxPageSize {
+				limit = MaxPageSize
+			} else {
+				limit = parsedLimit
+			}
+		}
+	}
+
+	if o := c.Query("offset"); o != "" {
+		if parsedOffset, err := strconv.Atoi(o); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
 
 	collection := state.MongoDatabase.Collection("files")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cursor, err := collection.Find(ctx, bson.M{"room_id": roomID})
+	// Get total count for pagination metadata
+	totalCount, err := collection.CountDocuments(ctx, bson.M{"room_id": roomID})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	// Query with pagination
+	opts := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset)).
+		SetLimit(int64(limit))
+
+	cursor, err := collection.Find(ctx, bson.M{"room_id": roomID}, opts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
@@ -169,7 +208,16 @@ func ListFiles(c *gin.Context) {
 		files[i].URL = fmt.Sprintf("/api/rooms/%s/files/%s/download", roomID, files[i].ID)
 	}
 
-	c.JSON(http.StatusOK, files)
+	// Return paginated response
+	c.JSON(http.StatusOK, gin.H{
+		"files": files,
+		"pagination": gin.H{
+			"total":   totalCount,
+			"limit":   limit,
+			"offset":  offset,
+			"hasMore": offset+len(files) < int(totalCount),
+		},
+	})
 }
 
 // DownloadFile streams a file from MinIO to the client
@@ -369,21 +417,16 @@ func DeleteAllFiles(c *gin.Context) {
 		return
 	}
 
-	// Delete from MinIO (best effort)
+	// Delete from MinIO using batch operation (much more efficient than sequential deletes)
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel2()
 
-	deletedCount := 0
-	for _, key := range storageKeys {
-		if err := state.MinIOClient.Delete(ctx2, key); err == nil {
-			deletedCount++
-		} else {
-			log.Printf("Warning: failed to delete %s from MinIO: %v", key, err)
-		}
+	if err := state.MinIOClient.DeleteBatch(ctx2, storageKeys); err != nil {
+		log.Printf("Warning: some MinIO deletions may have failed: %v", err)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Files deleted",
-		"count":   deletedCount,
+		"count":   len(storageKeys),
 	})
 }

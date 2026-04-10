@@ -172,24 +172,61 @@ func DeleteRoom(c *gin.Context) {
 		// Continue with deletion even if MinIO cleanup fails - we can clean up orphaned files later
 	}
 
-	// 2. Delete Room Metadata
-	_, err = collection.DeleteOne(ctx, bson.M{"slug": slug})
+	// 2. Use transaction for atomic deletion of room and file metadata
+	// This ensures we don't end up with orphaned file records if room deletion succeeds but file deletion fails
+	err = deleteRoomTransaction(ctx, slug)
 	if err != nil {
+		log.Printf("Failed to delete room transaction: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
 
-	// 3. Delete File Metadata
-	fileCollection := state.MongoDatabase.Collection("files")
-	_, _ = fileCollection.DeleteMany(ctx, bson.M{"room_id": slug})
-
-	// 4. Close WebSocket Connections
+	// 3. Close WebSocket Connections
 	ws.MainHub.CloseRoom(slug)
 
-	// 5. Purge all auth tokens for this room
+	// 4. Purge all auth tokens for this room
 	state.AuthTokens.DeleteAllForRoom(slug)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Room deleted"})
+}
+
+// deleteRoomTransaction handles atomic deletion of room and file metadata
+// Falls back to non-transactional deletion if transactions aren't supported (e.g., standalone MongoDB)
+func deleteRoomTransaction(ctx context.Context, slug string) error {
+	// Try transactional deletion first
+	session, err := state.MongoClient.StartSession()
+	if err == nil {
+		defer session.EndSession(ctx)
+
+		_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+			// Delete room
+			collection := state.MongoDatabase.Collection("rooms")
+			_, err := collection.DeleteOne(sessCtx, bson.M{"slug": slug})
+			if err != nil {
+				return nil, err
+			}
+
+			// Delete files
+			fileCollection := state.MongoDatabase.Collection("files")
+			_, err = fileCollection.DeleteMany(sessCtx, bson.M{"room_id": slug})
+			return nil, err
+		})
+		return err
+	}
+
+	// Fallback: non-transactional deletion (for standalone MongoDB or older versions)
+	log.Printf("Warning: MongoDB transactions not available, using non-transactional deletion: %v", err)
+
+	collection := state.MongoDatabase.Collection("rooms")
+	_, err = collection.DeleteOne(ctx, bson.M{"slug": slug})
+	if err != nil {
+		return err
+	}
+
+	fileCollection := state.MongoDatabase.Collection("files")
+	// Error intentionally ignored in fallback - room is already deleted, files will be cleaned up by orphaned files cleanup job
+	_, _ = fileCollection.DeleteMany(ctx, bson.M{"room_id": slug})
+	return nil
 }
 
 type SaveRoomRequest struct {
