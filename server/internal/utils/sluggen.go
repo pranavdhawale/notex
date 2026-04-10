@@ -11,6 +11,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+// Compile regex once at package level for better performance
+var customSlugRegex = regexp.MustCompile("^[a-z0-9]+(-[a-z0-9]+)?$")
+
 // GenerateSlug generates a human-friendly 2-word slug
 // Uses adjective-noun or color-animal patterns
 func GenerateSlug() string {
@@ -27,15 +30,15 @@ func GenerateUniqueSlug(ctx context.Context, collection *mongo.Collection) (stri
 	for i := 0; i < maxAttempts; i++ {
 		slug := GenerateSlug()
 
-		// Check if slug already exists
-		count, err := collection.CountDocuments(ctx, bson.M{"slug": slug})
+		// Use FindOne with limit instead of CountDocuments for better performance
+		var existing struct{}
+		err := collection.FindOne(ctx, bson.M{"slug": slug}).Decode(&existing)
+		if err == mongo.ErrNoDocuments {
+			// Slug is unique
+			return slug, nil
+		}
 		if err != nil {
 			return "", err
-		}
-
-		// If slug is unique, return it
-		if count == 0 {
-			return slug, nil
 		}
 	}
 
@@ -59,8 +62,8 @@ func ValidateCustomSlug(slug string) error {
 
 	// Check format: lowercase alphanumeric + hyphens
 	// Pattern: word or word-word (no leading/trailing hyphens, no consecutive hyphens)
-	matched, _ := regexp.MatchString("^[a-z0-9]+(-[a-z0-9]+)?$", slug)
-	if !matched {
+	// Use pre-compiled regex for better performance
+	if !customSlugRegex.MatchString(slug) {
 		return errors.New("slug must be lowercase alphanumeric with optional single hyphen")
 	}
 

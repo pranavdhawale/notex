@@ -17,6 +17,38 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// Semaphore to limit concurrent background TTL update goroutines
+// Prevents resource exhaustion under high load
+const maxConcurrentTTLUpdates = 10
+
+var ttlUpdateSemaphore = make(chan struct{}, maxConcurrentTTLUpdates)
+
+// init pre-fills the semaphore to allow immediate use
+func init() {
+	for i := 0; i < maxConcurrentTTLUpdates; i++ {
+		ttlUpdateSemaphore <- struct{}{}
+	}
+}
+
+// acquireSemaphore attempts to acquire a semaphore slot for TTL update
+// Returns true if acquired, false if at capacity
+func acquireSemaphore() bool {
+	select {
+	case <-ttlUpdateSemaphore:
+		return true
+	default:
+		return false
+	}
+}
+
+// releaseSemaphore returns a semaphore slot after TTL update completes
+func releaseSemaphore() {
+	select {
+	case ttlUpdateSemaphore <- struct{}{}:
+	default:
+	}
+}
+
 type CreateRoomRequest struct {
 	Owner      string  `json:"owner"`
 	CustomSlug *string `json:"customSlug,omitempty"` // Optional custom slug
@@ -57,15 +89,16 @@ func CreateRoom(c *gin.Context) {
 			return
 		}
 
-		// Check if already exists
-		count, err := collection.CountDocuments(ctx, bson.M{"slug": customSlug})
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check slug availability"})
+		// Check if already exists (use FindOne instead of CountDocuments for better performance)
+		var existingRoom models.Room
+		err = collection.FindOne(ctx, bson.M{"slug": customSlug}).Decode(&existingRoom)
+		if err == nil {
+			// Room exists
+			c.JSON(http.StatusConflict, gin.H{"error": "Room slug already taken"})
 			return
 		}
-
-		if count > 0 {
-			c.JSON(http.StatusConflict, gin.H{"error": "Room slug already taken"})
+		if err != mongo.ErrNoDocuments {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check slug availability"})
 			return
 		}
 
@@ -127,19 +160,26 @@ func GetRoom(c *gin.Context) {
 
 	newExpiry := calculateExpiry(hasContent)
 	// Update ExpireAt in background (don't block read)
-	go func(s string, t time.Time) {
-		bgCtx, bgCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer bgCancel()
-		_, err := collection.UpdateOne(bgCtx, bson.M{"slug": s}, bson.M{"$set": bson.M{"expire_at": t}})
-		if err != nil {
-			log.Printf("Failed to update room expiry for %s: %v", s, err)
-		}
+	// Use semaphore to limit concurrent TTL update goroutines
+	if acquireSemaphore() {
+		go func(s string, t time.Time) {
+			defer releaseSemaphore()
+			bgCtx, bgCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer bgCancel()
+			_, err := collection.UpdateOne(bgCtx, bson.M{"slug": s}, bson.M{"$set": bson.M{"expire_at": t}})
+			if err != nil {
+				log.Printf("Failed to update room expiry for %s: %v", s, err)
+			}
 
-		// Also update file TTL to match room TTL
-		if err := state.UpdateFilesTTL(s, t); err != nil {
-			log.Printf("Failed to update file TTL for room %s: %v", s, err)
-		}
-	}(slug, newExpiry)
+			// Also update file TTL to match room TTL
+			if err := state.UpdateFilesTTL(s, t); err != nil {
+				log.Printf("Failed to update file TTL for room %s: %v", s, err)
+			}
+		}(slug, newExpiry)
+	} else {
+		// If at capacity, log and skip TTL update (not critical)
+		log.Printf("TTL update queue at capacity, skipping TTL update for room %s", slug)
+	}
 
 	c.JSON(http.StatusOK, room)
 }
