@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle } from "react";
+import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Collaboration from "@tiptap/extension-collaboration";
@@ -612,17 +612,22 @@ export const Editor: React.FC<EditorProps> = ({
     if (!ydoc) return;
 
     let saveTimeout: ReturnType<typeof setTimeout>;
+    let isMounted = true;
 
     const saveHandler = () => {
       clearTimeout(saveTimeout);
       saveTimeout = setTimeout(() => {
-        cacheManager.saveYjs(roomSlug, ydoc);
+        // Only save if component is still mounted
+        if (isMounted) {
+          cacheManager.saveYjs(roomSlug, ydoc);
+        }
       }, 500); // 500ms debounce
     };
 
     ydoc.on('update', saveHandler);
 
     return () => {
+      isMounted = false;
       clearTimeout(saveTimeout);
       ydoc.off('update', saveHandler);
     };
@@ -788,12 +793,12 @@ export const Editor: React.FC<EditorProps> = ({
     };
   }, [roomSlug, userDetails, authToken]);
 
-  const handleSave = async (silent = false) => {
+  const handleSave = useCallback(async (silent = false) => {
     if (!ydoc) return;
     setSaving(true);
     try {
       const stateVector = Y.encodeStateAsUpdate(ydoc);
-      const blob = new Blob([stateVector as any]);
+      const blob = new Blob([stateVector as unknown as BlobPart]);
       const reader = new FileReader();
       reader.onload = async () => {
         const base64 = (reader.result as string).split(",")[1];
@@ -801,6 +806,10 @@ export const Editor: React.FC<EditorProps> = ({
           content: base64,
         });
         if (!silent) toast.success("Saved!");
+      };
+      reader.onerror = () => {
+        console.error("Failed to read blob");
+        if (!silent) toast.error("Failed to save");
       };
       reader.readAsDataURL(blob);
     } catch (e) {
@@ -810,7 +819,7 @@ export const Editor: React.FC<EditorProps> = ({
       // Keep "Saving..." indicator for a moment so user sees it
       setTimeout(() => setSaving(false), 500);
     }
-  };
+  }, [ydoc, roomSlug]);
 
   // Keep a ref to handleSave to avoid stale closure in keyboard handler
   const handleSaveRef = useRef(handleSave);
