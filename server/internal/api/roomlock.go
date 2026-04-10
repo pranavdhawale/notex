@@ -167,6 +167,9 @@ func LockRoom(c *gin.Context) {
 		return
 	}
 
+	// Update cache - mark room as locked
+	state.GetRoomCache().UpdateLock(slug, true)
+
 	// Generate auth token for the owner so they don't need to re-enter password
 	token, err := state.AuthTokens.Generate(slug, userID)
 	if err != nil {
@@ -239,6 +242,9 @@ func UnlockRoom(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unlock room"})
 		return
 	}
+
+	// Update cache - mark room as unlocked
+	state.GetRoomCache().UpdateLock(slug, false)
 
 	// Purge all auth tokens for this room
 	state.AuthTokens.DeleteAllForRoom(slug)

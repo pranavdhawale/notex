@@ -94,6 +94,13 @@ func CreateRoom(c *gin.Context) {
 		return
 	}
 
+	// Cache the new room for WebSocket connections
+	state.GetRoomCache().Set(slug, &state.RoomInfo{
+		Exists:   true,
+		Locked:   false,
+		ExpireAt: room.ExpireAt,
+	})
+
 	c.JSON(http.StatusCreated, room)
 }
 
@@ -186,6 +193,9 @@ func DeleteRoom(c *gin.Context) {
 
 	// 4. Purge all auth tokens for this room
 	state.AuthTokens.DeleteAllForRoom(slug)
+
+	// 5. Invalidate room cache
+	state.GetRoomCache().Delete(slug)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Room deleted"})
 }

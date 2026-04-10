@@ -100,26 +100,47 @@ func ServeWs(hub *Hub, c *gin.Context) {
 	// This is optional - the userID is also sent via X-User-ID header in HTTP requests
 	_ = c.Query("userID") // Currently unused but available for future features
 
-	// CHECK: Verify room exists in DB
-	collection := state.MongoDatabase.Collection("rooms")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// CHECK: Verify room exists (use cache first, fallback to DB)
+	roomCache := state.GetRoomCache()
+	cachedInfo := roomCache.Get(roomID)
 
 	var room models.Room
-	err := collection.FindOne(ctx, bson.M{"slug": roomID}).Decode(&room)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			log.Printf("Attempt to connect to non-existent room: %s", roomID)
-			http.Error(c.Writer, "Room not found", http.StatusNotFound)
+	var locked bool
+
+	if cachedInfo != nil {
+		// Cache hit - use cached data
+		locked = cachedInfo.Locked
+	} else {
+		// Cache miss - query database
+		collection := state.MongoDatabase.Collection("rooms")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+		err := collection.FindOne(ctx, bson.M{"slug": roomID}).Decode(&room)
+		cancel()
+
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				log.Printf("Attempt to connect to non-existent room: %s", roomID)
+				http.Error(c.Writer, "Room not found", http.StatusNotFound)
+				return
+			}
+			log.Printf("Database error checking room %s: %v", roomID, err)
+			http.Error(c.Writer, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		log.Printf("Database error checking room %s: %v", roomID, err)
-		http.Error(c.Writer, "Internal server error", http.StatusInternalServerError)
-		return
+
+		locked = room.Locked
+
+		// Cache the result for future connections
+		roomCache.Set(roomID, &state.RoomInfo{
+			Exists:   true,
+			Locked:   room.Locked,
+			ExpireAt: room.ExpireAt,
+		})
 	}
 
 	// CHECK: If room is locked, validate auth token
-	if room.Locked {
+	if locked {
 		authToken := c.Query("authToken")
 		if authToken == "" {
 			log.Printf("Attempt to connect to locked room without token: %s", roomID)

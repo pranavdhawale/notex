@@ -55,6 +55,10 @@ func main() {
 	// This handles cases where MongoDB TTL expires rooms but MinIO files remain
 	cleanupStopCh := cleanup.StartOrphanedFilesCleanup(1 * time.Hour)
 
+	// Start room cache cleanup (runs every 10 minutes)
+	// Removes expired room entries from in-memory cache
+	roomCacheStopCh := state.StartRoomCacheCleanup(10 * time.Minute)
+
 	// Start WebSocket Hub
 	go ws.MainHub.Run()
 
@@ -159,6 +163,7 @@ func main() {
 	// Stop background services
 	ws.MainHub.Stop()
 	close(cleanupStopCh)
+	close(roomCacheStopCh)
 
 	// Stop rate limiter cleanup goroutine
 	middleware.Shutdown()
