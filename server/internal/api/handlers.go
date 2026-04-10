@@ -166,11 +166,11 @@ func DeleteRoom(c *gin.Context) {
 	// 1. Delete from MinIO first (before any metadata changes)
 	// Use DeleteByPrefix to remove all files in the room's folder
 	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cleanupCancel()
 	if err := state.MinIOClient.DeleteByPrefix(cleanupCtx, slug+"/"); err != nil {
 		log.Printf("Warning: failed to delete MinIO files for room %s: %v", slug, err)
 		// Continue with deletion even if MinIO cleanup fails - we can clean up orphaned files later
 	}
-	cleanupCancel()
 
 	// 2. Delete Room Metadata
 	_, err = collection.DeleteOne(ctx, bson.M{"slug": slug})
