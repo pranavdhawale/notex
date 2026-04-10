@@ -193,11 +193,41 @@ func DeleteRoom(c *gin.Context) {
 }
 
 type SaveRoomRequest struct {
-	Content interface{} `json:"content"`
+	// Content must be a base64-encoded string (Yjs state vector)
+	// Using string instead of interface{} to prevent NoSQL injection
+	Content string `json:"content"`
 }
 
-// Max content size for room saves (10MB)
+// Max content size for room saves (10MB as base64 = ~7.5MB binary)
 const MaxContentSize = 10 * 1024 * 1024
+
+// isValidBase64 checks if a string is valid base64
+func isValidBase64(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	// Check length limit
+	if len(s) > MaxContentSize {
+		return false
+	}
+	// Base64 only contains A-Z, a-z, 0-9, +, /, and = for padding
+	for i, r := range s {
+		if !((r >= 'A' && r <= 'Z') ||
+			(r >= 'a' && r <= 'z') ||
+			(r >= '0' && r <= '9') ||
+			r == '+' || r == '/' || r == '=') {
+			// Allow newline characters (some base64 encoders include them)
+			if r != '\n' && r != '\r' {
+				return false
+			}
+			// Padding (=) should only appear at the end
+			if r == '=' && i < len(s)-2 {
+				return false
+			}
+		}
+	}
+	return true
+}
 
 func SaveRoom(c *gin.Context) {
 	slug := c.Param("room")
@@ -211,9 +241,16 @@ func SaveRoom(c *gin.Context) {
 		return
 	}
 
-	// Validate content is not nil
-	if req.Content == nil {
+	// Validate content is not empty
+	if req.Content == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Content is required"})
+		return
+	}
+
+	// Validate content is valid base64 (prevents NoSQL injection)
+	// Content should be a base64-encoded Yjs state vector
+	if !isValidBase64(req.Content) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Content must be valid base64-encoded data"})
 		return
 	}
 
@@ -228,6 +265,7 @@ func SaveRoom(c *gin.Context) {
 	// Saving implies content exists -> 7 Days TTL
 	newExpiry := calculateExpiry(true)
 
+	// Store content as string (base64) - this is safe because we validated it's base64
 	update := bson.M{
 		"$set": bson.M{
 			"content":   req.Content,
