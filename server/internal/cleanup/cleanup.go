@@ -12,15 +12,24 @@ import (
 // StartOrphanedFilesCleanup starts a background goroutine that periodically
 // cleans up MinIO files that no longer have a corresponding room in MongoDB.
 // This handles the case where MongoDB TTL expires a room but MinIO files remain.
-func StartOrphanedFilesCleanup(interval time.Duration) {
+// Returns a stop channel to gracefully shutdown the cleanup goroutine.
+func StartOrphanedFilesCleanup(interval time.Duration) chan struct{} {
+	stopCh := make(chan struct{})
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			cleanupOrphanedFiles()
+		for {
+			select {
+			case <-ticker.C:
+				cleanupOrphanedFiles()
+			case <-stopCh:
+				log.Println("Orphaned files cleanup stopped")
+				return
+			}
 		}
 	}()
+	return stopCh
 }
 
 // cleanupOrphanedFiles finds and removes MinIO files whose rooms no longer exist

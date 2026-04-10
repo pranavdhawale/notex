@@ -7,8 +7,8 @@ import (
 
 // TestStartOrphanedFilesCleanup_Signature tests the cleanup function signature
 func TestStartOrphanedFilesCleanup_Signature(t *testing.T) {
-	// Verify the function exists and has correct signature
-	var _ func(time.Duration) = StartOrphanedFilesCleanup
+	// Verify the function exists and has correct signature (returns stop channel)
+	var _ func(time.Duration) chan struct{} = StartOrphanedFilesCleanup
 
 	t.Log("StartOrphanedFilesCleanup function signature is correct")
 }

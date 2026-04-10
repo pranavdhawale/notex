@@ -23,6 +23,9 @@ type Hub struct {
 
 	// Lock for rooms map
 	mu sync.RWMutex
+
+	// Stop channel for graceful shutdown
+	stopCh chan struct{}
 }
 
 type Message struct {
@@ -35,9 +38,10 @@ func NewHub() *Hub {
 	return &Hub{
 		rooms:      make(map[string]map[*Client]bool),
 		awareness:  make(map[string]map[*Client][]byte),
-		broadcast:  make(chan *Message),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
+		broadcast:  make(chan *Message, 1000), // Buffered for performance
+		register:   make(chan *Client, 100),   // Buffered for performance
+		unregister: make(chan *Client, 100),   // Buffered for performance
+		stopCh:     make(chan struct{}),
 	}
 }
 
@@ -61,6 +65,20 @@ func (h *Hub) CloseRoom(roomID string) {
 func (h *Hub) Run() {
 	for {
 		select {
+		case <-h.stopCh:
+			// Graceful shutdown - close all client connections
+			h.mu.Lock()
+			for _, clients := range h.rooms {
+				for client := range clients {
+					close(client.send)
+				}
+			}
+			h.rooms = make(map[string]map[*Client]bool)
+			h.awareness = make(map[string]map[*Client][]byte)
+			h.mu.Unlock()
+			log.Println("Hub shutdown complete")
+			return
+
 		case client := <-h.register:
 			h.mu.Lock()
 			if _, ok := h.rooms[client.roomID]; !ok {
@@ -142,4 +160,9 @@ func (h *Hub) Run() {
 			}
 		}
 	}
+}
+
+// Stop gracefully shuts down the hub
+func (h *Hub) Stop() {
+	close(h.stopCh)
 }
