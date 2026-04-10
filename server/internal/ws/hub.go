@@ -3,7 +3,22 @@ package ws
 import (
 	"log"
 	"sync"
+	"sync/atomic"
 )
+
+const (
+	// Maximum size of awareness cache per room (prevents unbounded memory growth)
+	maxAwarenessPerRoom = 100
+	// Maximum size of awareness message in bytes
+	maxAwarenessMessageSize = 1024
+)
+
+// Metrics for monitoring
+type HubMetrics struct {
+	MessagesDropped   int64
+	ClientsConnected   int64
+	RoomsActive       int64
+}
 
 type Hub struct {
 	// Registered clients by room
@@ -26,6 +41,9 @@ type Hub struct {
 
 	// Stop channel for graceful shutdown
 	stopCh chan struct{}
+
+	// Metrics
+	metrics HubMetrics
 }
 
 type Message struct {
@@ -42,6 +60,15 @@ func NewHub() *Hub {
 		register:   make(chan *Client, 100),   // Buffered for performance
 		unregister: make(chan *Client, 100),   // Buffered for performance
 		stopCh:     make(chan struct{}),
+	}
+}
+
+// GetMetrics returns current hub metrics (thread-safe)
+func (h *Hub) GetMetrics() HubMetrics {
+	return HubMetrics{
+		MessagesDropped: atomic.LoadInt64(&h.metrics.MessagesDropped),
+		ClientsConnected: atomic.LoadInt64(&h.metrics.ClientsConnected),
+		RoomsActive:     atomic.LoadInt64(&h.metrics.RoomsActive),
 	}
 }
 
@@ -86,6 +113,7 @@ func (h *Hub) Run() {
 				h.awareness[client.roomID] = make(map[*Client][]byte)
 			}
 			h.rooms[client.roomID][client] = true
+			atomic.AddInt64(&h.metrics.ClientsConnected, 1)
 
 			// Send existing awareness states to the new client
 			if states, ok := h.awareness[client.roomID]; ok {
@@ -93,12 +121,13 @@ func (h *Hub) Run() {
 					select {
 					case client.send <- state:
 					default:
-						// Buffer full, skip this state
+						// Buffer full, skip this state (non-critical awareness data)
+						atomic.AddInt64(&h.metrics.MessagesDropped, 1)
 					}
 				}
 			}
 			h.mu.Unlock()
-			log.Printf("Client registered to room: %s", client.roomID)
+			log.Printf("Client registered to room: %s (total clients: %d)", client.roomID, atomic.LoadInt64(&h.metrics.ClientsConnected))
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -106,6 +135,7 @@ func (h *Hub) Run() {
 			if _, ok := h.rooms[client.roomID]; ok {
 				if _, ok := h.rooms[client.roomID][client]; ok {
 					delete(h.rooms[client.roomID], client)
+					atomic.AddInt64(&h.metrics.ClientsConnected, -1)
 
 					// Remove from awareness cache too
 					if _, ok := h.awareness[client.roomID]; ok {
@@ -129,8 +159,24 @@ func (h *Hub) Run() {
 
 			// Detect Awareness Message (Type 1)
 			if len(message.Content) > 0 && message.Content[0] == 1 {
+				// Limit awareness message size to prevent memory bloat
+				if len(message.Content) > maxAwarenessMessageSize {
+					log.Printf("Awareness message too large (%d bytes), skipping", len(message.Content))
+					h.mu.Unlock()
+					continue
+				}
+
 				if _, ok := h.awareness[message.RoomID]; !ok {
 					h.awareness[message.RoomID] = make(map[*Client][]byte)
+				}
+
+				// Limit awareness cache size per room to prevent unbounded growth
+				if len(h.awareness[message.RoomID]) >= maxAwarenessPerRoom {
+					// Remove oldest entry (first in map iteration)
+					for k := range h.awareness[message.RoomID] {
+						delete(h.awareness[message.RoomID], k)
+						break
+					}
 				}
 
 				// Make a copy of the slice to ensure persistence
@@ -154,7 +200,8 @@ func (h *Hub) Run() {
 					case client.send <- message.Content:
 					default:
 						// Client buffer full, message dropped (client may be slow/disconnected)
-						log.Printf("Client buffer full in room %s, dropping message", message.RoomID)
+						atomic.AddInt64(&h.metrics.MessagesDropped, 1)
+						log.Printf("Client buffer full in room %s, dropping message (total dropped: %d)", message.RoomID, atomic.LoadInt64(&h.metrics.MessagesDropped))
 					}
 				}
 			}
