@@ -3,6 +3,7 @@ package state
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"log"
 	"sync"
 	"time"
 )
@@ -18,6 +19,9 @@ type AuthToken struct {
 type TokenStore struct {
 	mu     sync.RWMutex
 	tokens map[string]*AuthToken
+
+	// Channel for graceful shutdown
+	stopCh chan struct{}
 }
 
 // Global token store
@@ -26,8 +30,9 @@ var AuthTokens = NewTokenStore()
 func NewTokenStore() *TokenStore {
 	store := &TokenStore{
 		tokens: make(map[string]*AuthToken),
+		stopCh: make(chan struct{}),
 	}
-	// Start cleanup goroutine
+	// Start cleanup goroutine with graceful shutdown
 	go store.cleanup()
 	return store
 }
@@ -53,10 +58,10 @@ func (s *TokenStore) Generate(roomSlug, userID string) (string, error) {
 }
 
 // Validate checks if a token is valid and returns the associated room slug
-// If valid, the token is consumed (deleted) - single use
+// Tokens are multi-use within their validity window to support WebSocket reconnection
 func (s *TokenStore) Validate(token string) (roomSlug string, userID string, valid bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	auth, exists := s.tokens[token]
 	if !exists {
@@ -65,15 +70,12 @@ func (s *TokenStore) Validate(token string) (roomSlug string, userID string, val
 
 	// Check expiration
 	if time.Now().After(auth.Expires) {
-		delete(s.tokens, token)
 		return "", "", false
 	}
 
-	// Token is valid - consume it (single use)
-	roomSlug = auth.RoomSlug
-	userID = auth.UserID
-	delete(s.tokens, token)
-	return roomSlug, userID, true
+	// Token is valid - return info without consuming
+	// This allows WebSocket reconnections to use the same token
+	return auth.RoomSlug, auth.UserID, true
 }
 
 // Delete removes a specific token
@@ -94,17 +96,30 @@ func (s *TokenStore) DeleteAllForRoom(roomSlug string) {
 	s.mu.Unlock()
 }
 
-// cleanup removes expired tokens every minute
+// Shutdown stops the cleanup goroutine
+func (s *TokenStore) Shutdown() {
+	close(s.stopCh)
+}
+
+// cleanup removes expired tokens periodically with graceful shutdown
 func (s *TokenStore) cleanup() {
 	ticker := time.NewTicker(time.Minute)
-	for range ticker.C {
-		s.mu.Lock()
-		now := time.Now()
-		for token, auth := range s.tokens {
-			if now.After(auth.Expires) {
-				delete(s.tokens, token)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			s.mu.Lock()
+			now := time.Now()
+			for token, auth := range s.tokens {
+				if now.After(auth.Expires) {
+					delete(s.tokens, token)
+				}
 			}
+			s.mu.Unlock()
+		case <-s.stopCh:
+			log.Println("Token store cleanup stopped")
+			return
 		}
-		s.mu.Unlock()
 	}
 }

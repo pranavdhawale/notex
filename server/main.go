@@ -168,6 +168,9 @@ func main() {
 	// Stop rate limiter cleanup goroutine
 	middleware.Shutdown()
 
+	// Stop token store cleanup goroutine
+	state.AuthTokens.Shutdown()
+
 	// Give connections time to finish
 	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

@@ -751,7 +751,9 @@ export const Editor: React.FC<EditorProps> = ({
 
       provider = new WebsocketProvider(wsUrl, roomSlug, doc, {
         connect: false,
-        params
+        params,
+        // Resync document every 5 seconds to handle missed updates during reconnection
+        resyncInterval: 5000,
       });
 
       provider.on("status", (event: any) => {
