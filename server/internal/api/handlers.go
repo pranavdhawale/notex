@@ -167,7 +167,11 @@ func GetRoom(c *gin.Context) {
 			defer releaseSemaphore()
 			bgCtx, bgCancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer bgCancel()
-			_, err := collection.UpdateOne(bgCtx, bson.M{"slug": s}, bson.M{"$set": bson.M{"expire_at": t}})
+			// Use $max to atomically update expire_at only if new value is greater
+			// This prevents race conditions when multiple requests update TTL concurrently
+			_, err := collection.UpdateOne(bgCtx, bson.M{"slug": s}, bson.M{
+				"$max": bson.M{"expire_at": t},
+			})
 			if err != nil {
 				log.Printf("Failed to update room expiry for %s: %v", s, err)
 			}
@@ -286,8 +290,9 @@ type SaveRoomRequest struct {
 	Content string `json:"content"`
 }
 
-// Max content size for room saves (10MB as base64 = ~7.5MB binary)
-const MaxContentSize = 10 * 1024 * 1024
+// Max content size for room saves (16MB - MongoDB's max document size)
+// Base64 encoding increases size by ~33%, so ~12MB binary data fits in 16MB
+const MaxContentSize = 16 * 1024 * 1024
 
 // isValidBase64 checks if a string is valid base64
 func isValidBase64(s string) bool {
@@ -354,9 +359,12 @@ func SaveRoom(c *gin.Context) {
 	newExpiry := calculateExpiry(true)
 
 	// Store content as string (base64) - this is safe because we validated it's base64
+	// Use $max for expire_at to prevent race conditions with concurrent TTL updates
 	update := bson.M{
 		"$set": bson.M{
-			"content":   req.Content,
+			"content": req.Content,
+		},
+		"$max": bson.M{
 			"expire_at": newExpiry,
 		},
 	}
