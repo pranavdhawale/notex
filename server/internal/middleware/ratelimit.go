@@ -76,10 +76,13 @@ var (
 	// File uploads: 10 per room+user per minute
 	UploadLimiter = NewRateLimiter(10, time.Minute)
 
+	// File downloads: 30 per room+user per minute (higher limit for downloads)
+	DownloadLimiter = NewRateLimiter(30, time.Minute)
+
 	// Room creation: 5 per IP per minute
 	RoomLimiter = NewRateLimiter(5, time.Minute)
 
-	// Room save: 30 per room per minute (aut-save is frequent)
+	// Room save: 30 per room per minute (auto-save is frequent)
 	SaveLimiter = NewRateLimiter(30, time.Minute)
 
 	// Password verification: 5 attempts per IP+room per minute
@@ -157,6 +160,30 @@ func RateLimitPassword() gin.HandlerFunc {
 	}
 }
 
+// RateLimitDownload limits file download requests per room+user
+func RateLimitDownload() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		room := c.Param("room")
+		userID := c.GetString("userID")
+
+		// Key combines room and user for per-room-per-user limiting
+		// Falls back to IP if userID is not set
+		key := room + ":" + userID
+		if userID == "" {
+			key = room + ":" + c.ClientIP()
+		}
+
+		if !DownloadLimiter.Allow(key) {
+			c.JSON(429, gin.H{
+				"error": "Too many downloads for this room. Please wait a moment and try again.",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // Shutdown stops the cleanup goroutine
 func Shutdown() {
 	close(shutdownCh)
@@ -172,6 +199,7 @@ func init() {
 			select {
 			case <-ticker.C:
 				UploadLimiter.Cleanup()
+				DownloadLimiter.Cleanup()
 				RoomLimiter.Cleanup()
 				SaveLimiter.Cleanup()
 				PasswordLimiter.Cleanup()

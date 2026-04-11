@@ -50,7 +50,7 @@ func releaseSemaphore() {
 }
 
 type CreateRoomRequest struct {
-	Owner      string  `json:"owner"`
+	Owner      string  `json:"owner" binding:"required,max=100"`
 	CustomSlug *string `json:"customSlug,omitempty"` // Optional custom slug
 }
 
@@ -68,7 +68,8 @@ func calculateExpiry(hasContent bool) time.Time {
 func CreateRoom(c *gin.Context) {
 	var req CreateRoomRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		// Return generic validation error to avoid leaking internal details
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
 		return
 	}
 

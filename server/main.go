@@ -121,7 +121,7 @@ func main() {
 		// File upload - rate limited: 10 uploads per room per user per minute
 		protected.POST("/upload/:room", middleware.RateLimitUpload(), api.UploadFile)
 		protected.GET("/rooms/:room/files", api.ListFiles)
-		protected.GET("/rooms/:room/files/:fileId/download", api.DownloadFile)
+		protected.GET("/rooms/:room/files/:fileId/download", middleware.RateLimitDownload(), api.DownloadFile)
 		protected.DELETE("/rooms/:room/files", api.DeleteAllFiles)
 		protected.DELETE("/rooms/:room/files/:fileId", api.DeleteFile)
 	}

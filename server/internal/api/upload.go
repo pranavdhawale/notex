@@ -23,6 +23,7 @@ const MaxFileSize = 200 * 1024 * 1024 // 200MB
 const MaxFilenameLength = 50          // Maximum filename length
 
 // sanitizeFilename removes dangerous characters from filename for safe header usage
+// Prevents XSS attacks via Content-Disposition header
 func sanitizeFilename(name string) string {
 	// Remove control characters, quotes, backslashes, and newlines
 	name = strings.Map(func(r rune) rune {
@@ -31,6 +32,14 @@ func sanitizeFilename(name string) string {
 		}
 		return r
 	}, name)
+
+	// Escape HTML special characters to prevent XSS in Content-Disposition header
+	// RFC 6266 recommends escaping or quoting filenames with special characters
+	name = strings.ReplaceAll(name, "<", "_")
+	name = strings.ReplaceAll(name, ">", "_")
+	name = strings.ReplaceAll(name, "&", "_")
+	name = strings.ReplaceAll(name, "'", "_")
+	name = strings.ReplaceAll(name, ";", "_")
 
 	// Limit length
 	if len(name) > MaxFilenameLength {
