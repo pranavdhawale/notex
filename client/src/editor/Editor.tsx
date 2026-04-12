@@ -15,7 +15,6 @@ import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
-import { FontSize } from "./extensions/FontSize";
 import { Indent } from "./extensions/Indent";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
@@ -82,6 +81,7 @@ const TiptapEditor = forwardRef<EditorRef, {
   onUnlockRoom,
 }, ref) => {
   const [menuState, setMenuState] = useState({ isOpen: false, x: 0, y: 0 });
+  const [editorBounds, setEditorBounds] = useState<DOMRect | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -103,8 +103,48 @@ const TiptapEditor = forwardRef<EditorRef, {
       }),
       Underline,
       Highlight,
-      Subscript,
-      Superscript,
+      Subscript.configure({
+        HTMLAttributes: {
+          class: "subscript",
+        },
+      }).extend({
+        addKeyboardShortcuts() {
+          return {
+            "Mod-,": () => {
+              // If subscript is already active, just toggle it off
+              if (this.editor.isActive("subscript")) {
+                return this.editor.commands.unsetSubscript();
+              }
+              // Otherwise, remove superscript first, then apply subscript
+              return this.editor.chain()
+                .unsetSuperscript()
+                .setSubscript()
+                .run();
+            },
+          };
+        },
+      }),
+      Superscript.configure({
+        HTMLAttributes: {
+          class: "superscript",
+        },
+      }).extend({
+        addKeyboardShortcuts() {
+          return {
+            "Mod-.": () => {
+              // If superscript is already active, just toggle it off
+              if (this.editor.isActive("superscript")) {
+                return this.editor.commands.unsetSuperscript();
+              }
+              // Otherwise, remove subscript first, then apply superscript
+              return this.editor.chain()
+                .unsetSubscript()
+                .setSuperscript()
+                .run();
+            },
+          };
+        },
+      }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Link.configure({ openOnClick: false }),
@@ -115,7 +155,6 @@ const TiptapEditor = forwardRef<EditorRef, {
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       TextStyle,
       Color,
-      FontSize,
       Indent.configure({
         types: ["listItem", "paragraph", "heading"],
         minLevel: 0,
@@ -201,20 +240,22 @@ const TiptapEditor = forwardRef<EditorRef, {
 
     const target = e.target as HTMLElement;
     // Check if the right-click occurred inside a table
-    const isInsideTable = target.closest('table') !== null || target.closest('td') !== null || target.closest('th') !== null || editor.isActive('table');
+    const tableCell = target.closest('td') || target.closest('th');
+    const isInsideTable = tableCell !== null;
 
     if (isInsideTable) {
       e.preventDefault();
-      // Set the cursor position to the clicked element if possible, 
-      // though Tiptap usually handles this automatically on mousedown.
-      
+      e.stopPropagation();
+      // Get the editor container bounds for positioning
+      const bounds = scrollRef.current?.getBoundingClientRect() || null;
+      setEditorBounds(bounds);
       setMenuState({
         isOpen: true,
         x: e.clientX,
         y: e.clientY,
       });
     } else {
-      // If clicking outside a table, just let native menu show or close our menu
+      // If clicking outside a table, close our menu
       if (menuState.isOpen) {
         setMenuState(prev => ({ ...prev, isOpen: false }));
       }
@@ -427,6 +468,7 @@ const TiptapEditor = forwardRef<EditorRef, {
           isOpen={menuState.isOpen}
           x={menuState.x}
           y={menuState.y}
+          editorBounds={editorBounds}
           onClose={() => setMenuState(prev => ({ ...prev, isOpen: false }))}
         />
         <div onContextMenu={handleContextMenu} style={{ minHeight: '100%' }}>
@@ -705,7 +747,6 @@ export const Editor: React.FC<EditorProps> = ({
               bytes[i] = binaryString.charCodeAt(i);
             }
             Y.applyUpdate(ydoc, bytes);
-            console.log("📥 Server snapshot merged");
           } catch (err) {
             console.error("Failed to merge server snapshot", err);
           }
@@ -759,7 +800,6 @@ export const Editor: React.FC<EditorProps> = ({
       if (cachedUpdate) {
         try {
           Y.applyUpdate(doc, cachedUpdate);
-          console.log("✅ Restored Yjs state from SessionStorage");
         } catch (e) {
           console.error("Failed to apply cached Yjs state:", e);
         }
