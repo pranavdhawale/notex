@@ -85,7 +85,7 @@ func main() {
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("X-XSS-Protection", "1; mode=block")
-		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none';")
+		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none';")
 		c.Next()
 	})
 
@@ -122,6 +122,7 @@ func main() {
 		protected.POST("/upload/:room", middleware.RateLimitUpload(), api.UploadFile)
 		protected.GET("/rooms/:room/files", api.ListFiles)
 		protected.GET("/rooms/:room/files/:fileId/download", middleware.RateLimitDownload(), api.DownloadFile)
+		protected.GET("/rooms/:room/files/:fileId/image", middleware.RateLimitDownload(), api.ServeImage)
 		protected.DELETE("/rooms/:room/files", api.DeleteAllFiles)
 		protected.DELETE("/rooms/:room/files/:fileId", api.DeleteFile)
 	}
