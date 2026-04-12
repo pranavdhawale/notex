@@ -4,8 +4,9 @@
  * falls back to navigator.platform for older browsers
  */
 
-// Cache the result to avoid repeated checks
+// Cache results to avoid repeated checks
 let cachedIsMac: boolean | null = null;
+let cachedIsSafari: boolean | null = null;
 
 /**
  * Check if the current platform is macOS
@@ -28,6 +29,21 @@ export function isMacOS(): boolean {
 	// Fallback to navigator.platform
 	cachedIsMac = navigator.platform.toUpperCase().includes('MAC');
 	return cachedIsMac;
+}
+
+/**
+ * Check if the current browser is Safari
+ * Safari check: has Safari in UA but not Chrome/Chromium
+ */
+export function isSafari(): boolean {
+	if (cachedIsSafari !== null) return cachedIsSafari;
+	if (typeof navigator === 'undefined') return false;
+
+	const ua = navigator.userAgent;
+	cachedIsSafari = ua.includes('Safari') &&
+	                 !ua.includes('Chrome') &&
+	                 !ua.includes('Chromium');
+	return cachedIsSafari;
 }
 
 /**
