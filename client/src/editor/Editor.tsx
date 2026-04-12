@@ -16,6 +16,8 @@ import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Indent } from "./extensions/Indent";
+import { ImageExtension } from "./extensions/Image";
+import { FileHandler } from "@tiptap/extension-file-handler";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 
@@ -35,7 +37,7 @@ import { NotFoundView } from "../components/NotFoundView";
 import { toast } from "../components/Toaster";
 import { KeyboardShortcutsPopup } from "../components/KeyboardShortcutsPopup";
 import { LockRoomModal, UnlockRoomModal } from "../components/LockUnlockModal";
-import { CURSOR_COLORS } from "../utils/constants";
+import { CURSOR_COLORS, IMAGE_UPLOAD } from "../utils/constants";
 
 interface EditorProps {
   roomSlug: string;
@@ -65,6 +67,7 @@ const TiptapEditor = forwardRef<EditorRef, {
   handleSave: () => void;
   onLockRoom: () => void;
   onUnlockRoom: () => void;
+  onImageUpload: (file: File) => Promise<string | null>;
 }>(({
   provider,
   userDetails,
@@ -79,6 +82,7 @@ const TiptapEditor = forwardRef<EditorRef, {
   handleSave,
   onLockRoom,
   onUnlockRoom,
+  onImageUpload,
 }, ref) => {
   const [menuState, setMenuState] = useState({ isOpen: false, x: 0, y: 0 });
   const [editorBounds, setEditorBounds] = useState<DOMRect | null>(null);
@@ -86,6 +90,92 @@ const TiptapEditor = forwardRef<EditorRef, {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const scrollHideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Ref to keep onImageUpload fresh for the FileHandler callbacks in useEditor
+  const onImageUploadRef = useRef(onImageUpload);
+  onImageUploadRef.current = onImageUpload;
+
+  // Handle image files from drag-drop or paste
+  const handleImageFiles = useCallback((editor: ReturnType<typeof useEditor> | null, files: File[], pos?: number) => {
+    if (!editor) return;
+
+    for (const file of files) {
+      // Validate MIME type
+      if (!(IMAGE_UPLOAD.ALLOWED_MIME_TYPES as readonly string[]).includes(file.type)) continue;
+
+      // Validate file size
+      if (file.size > IMAGE_UPLOAD.MAX_SIZE) {
+        toast.error(`Image "${file.name}" exceeds 10MB limit.`);
+        continue;
+      }
+
+      // Create a temporary blob URL for immediate display
+      const blobUrl = URL.createObjectURL(file);
+
+      // Determine insertion position
+      const insertPos = pos ?? editor.state.selection.from;
+
+      // Insert image node with uploading state
+      editor.chain().focus().insertContentAt(insertPos, {
+        type: 'image',
+        attrs: {
+          src: blobUrl,
+          alt: file.name,
+          'data-uploading': 'true',
+          'data-upload-progress': 0,
+        },
+      }).run();
+
+      // Upload in the background
+      onImageUploadRef.current(file).then((serverUrl) => {
+        // Find the node we just inserted by matching blobUrl
+        let nodePos: number | null = null;
+        editor.state.doc.descendants((node, offset) => {
+          if (node.type.name === 'image' && node.attrs.src === blobUrl) {
+            nodePos = offset;
+            return false; // stop iteration
+          }
+          return true;
+        });
+
+        if (nodePos === null) {
+          // Node was removed before upload completed
+          URL.revokeObjectURL(blobUrl);
+          return;
+        }
+
+        if (serverUrl) {
+          // Update src to server URL and remove uploading state
+          // Use a transaction to update the specific node at nodePos
+          editor.state.doc.nodesBetween(nodePos, nodePos + 1, (node, offset) => {
+            if (node.type.name === 'image' && node.attrs.src === blobUrl) {
+              const tr = editor.state.tr.setNodeMarkup(offset, undefined, {
+                ...node.attrs,
+                src: serverUrl,
+                'data-uploading': null,
+                'data-upload-progress': null,
+              });
+              editor.view.dispatch(tr);
+              return false;
+            }
+          });
+          URL.revokeObjectURL(blobUrl);
+        } else {
+          // Upload failed — show error state
+          editor.state.doc.nodesBetween(nodePos, nodePos + 1, (node, offset) => {
+            if (node.type.name === 'image' && node.attrs.src === blobUrl) {
+              const tr = editor.state.tr.setNodeMarkup(offset, undefined, {
+                ...node.attrs,
+                'data-uploading': 'error',
+              });
+              editor.view.dispatch(tr);
+              return false;
+            }
+          });
+        }
+      });
+    }
+  }, []);
 
   const editor = useEditor({
     extensions: [
@@ -160,6 +250,20 @@ const TiptapEditor = forwardRef<EditorRef, {
         minLevel: 0,
         maxLevel: 8,
         indentRange: 24,
+      }),
+      ImageExtension,
+      FileHandler.configure({
+        allowedMimeTypes: [...IMAGE_UPLOAD.ALLOWED_MIME_TYPES],
+        onDrop: (editor, files, pos) => {
+          handleImageFiles(editor, files, pos);
+        },
+        onPaste: (editor, files) => {
+          if (files.length > 0) {
+            handleImageFiles(editor, files);
+            return true;
+          }
+          return false;
+        },
       }),
     ],
 
@@ -619,6 +723,39 @@ export const Editor: React.FC<EditorProps> = ({
     }
   };
 
+  // Upload an image file and return the server URL for inline embedding
+  const handleImageUpload = async (file: File): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await api.post(`/api/upload/${roomSlug}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 10 * 60 * 1000,
+      });
+
+      const newFile = res.data;
+
+      // Signal other clients via Yjs metadata
+      if (ydoc) {
+        const yMeta = ydoc.getMap("meta");
+        yMeta.set("lastUpload", Date.now());
+      }
+
+      setFiles((prev) => [...prev, newFile]);
+
+      // Return the inline image URL (served with correct Content-Type)
+      return `/api/rooms/${roomSlug}/files/${newFile.id}/image`;
+    } catch (err: any) {
+      if (err.response?.data?.error) {
+        toast.error(err.response.data.error);
+      } else {
+        toast.error(`Failed to upload image "${file.name}".`);
+      }
+      return null;
+    }
+  };
+
   const handleFileDelete = async (fileId: string) => {
     if (!confirm("Delete this file?")) return;
     try {
@@ -965,6 +1102,7 @@ export const Editor: React.FC<EditorProps> = ({
           handleLeave={handleLeave}
           handleDeleteRoom={handleDeleteRoom}
           handleSave={() => handleSave(false)}
+          onImageUpload={handleImageUpload}
           onLockRoom={() => setShowLockModal(true)}
           onUnlockRoom={() => setShowUnlockModal(true)}
         />

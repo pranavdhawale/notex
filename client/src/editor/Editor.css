@@ -428,6 +428,20 @@
   margin: 0; /* prevent extra spacing inside quote */
 }
 
+/* Inline Images */
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.5em 0;
+  display: block;
+}
+
+.ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid var(--color-primary, #70CFF8);
+  outline-offset: 2px;
+}
+
 /* Tables */
 .ProseMirror .tableWrapper {
   display: block;      /* Ensure it's a block-level element */
