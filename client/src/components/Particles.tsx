@@ -319,7 +319,6 @@ const Particles: React.FC<ParticlesProps> = ({
         container.removeChild(gl.canvas);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     particleCount,
     particleSpread,
@@ -332,6 +331,7 @@ const Particles: React.FC<ParticlesProps> = ({
     cameraDistance,
     disableRotation,
     pixelRatio,
+    particleColors,
   ]);
 
   return (
