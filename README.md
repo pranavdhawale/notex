@@ -33,6 +33,7 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 - **Links**: Add and manage hyperlinks
 - **Text Alignment**: Left, center, right, justify
 - **Indentation**: Tab/Shift+Tab for indent/outdent
+- **Inline Images**: Drag-drop or paste images directly into the document
 
 ### 🤝 Real-Time Collaboration
 
@@ -58,6 +59,7 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 
 - **Upload Files**: Share files within rooms
 - **Download Files**: Access uploaded files anytime
+- **Inline Images**: Paste or drag images into the editor — they upload automatically and embed inline for all collaborators
 - **File Management**: View all files in a room
 
 ### ⚡ Performance & Caching
@@ -97,6 +99,7 @@ Notex isn't just a toy; it's an architectural showcase.
 - **React 19 + Vite**: Blazing fast builds and HMR
 - **TypeScript**: Type-safe development
 - **Tiptap v3**: Headless wrapper for ProseMirror, full editor control with reactive state
+- **Tiptap Image + FileHandler**: Inline image drag-drop-paste with authenticated rendering
 - **Yjs**: CRDT library for conflict-free real-time collaboration
 - **OGL**: Ultra-lightweight WebGL library for the particle system
 - **Lucide React**: Beautiful icon library
@@ -175,7 +178,11 @@ notex/
 │   │   │   ├── Toolbar.tsx
 │   │   │   ├── FilesSidebar.tsx
 │   │   │   ├── FilesModal.tsx
-│   │   │   └── TableContextMenu.tsx
+│   │   │   ├── TableContextMenu.tsx
+│   │   │   └── extensions/  # Custom Tiptap extensions
+│   │   │       ├── Image.ts
+│   │   │       ├── ImageNodeView.tsx
+│   │   │       └── Indent.ts
 │   │   ├── components/    # Shared components
 │   │   │   ├── ActiveUsersAvatars.tsx
 │   │   │   ├── ConfirmationModal.tsx
@@ -191,6 +198,7 @@ notex/
 │   │   │   ├── api.ts
 │   │   │   ├── constants.ts
 │   │   │   ├── fileIcons.tsx
+│   │   │   ├── platform.ts
 │   │   │   ├── session.ts
 │   │   │   └── SmartCacheManager.ts
 │   │   ├── App.tsx
@@ -203,6 +211,7 @@ notex/
 │   │   ├── api/          # Protected HTTP handlers
 │   │   │   ├── handlers.go
 │   │   │   ├── upload.go
+│   │   │   ├── image.go
 │   │   │   └── roomlock.go
 │   │   ├── cleanup/      # Orphaned file cleanup
 │   │   ├── middleware/   # Security layer (Auth & Rate limits)
