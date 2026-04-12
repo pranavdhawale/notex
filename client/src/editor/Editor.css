@@ -697,7 +697,7 @@
   gap: 12px;
   flex-wrap: wrap;
   background: transparent;
-  overflow: hidden; /* Prevent horizontal scroll */
+  overflow: visible; /* Allow dropdowns to appear */
   min-width: 0; /* Allow shrinking */
 }
 
