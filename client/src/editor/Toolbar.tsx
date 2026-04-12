@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import React, { memo, useState, useRef, useEffect } from "react";
 import { Editor } from "@tiptap/react";
 import {
   Bold,
@@ -20,14 +20,56 @@ import {
   AlignRight,
   AlignJustify,
   Link,
-  Table as TableIcon
+  Table as TableIcon,
+  Subscript as SubscriptIcon,
+  Superscript as SuperscriptIcon,
+  Palette,
+  Type,
+  IndentIncrease,
+  IndentDecrease,
 } from "lucide-react";
+
+// Color palette for text color
+const TEXT_COLORS = [
+  { name: "Default", color: "inherit" },
+  { name: "Gray", color: "#6b7280" },
+  { name: "Brown", color: "#92400e" },
+  { name: "Orange", color: "#ea580c" },
+  { name: "Yellow", color: "#ca8a04" },
+  { name: "Green", color: "#16a34a" },
+  { name: "Blue", color: "#2563eb" },
+  { name: "Purple", color: "#9333ea" },
+  { name: "Pink", color: "#db2777" },
+  { name: "Red", color: "#dc2626" },
+];
+
+// Font size options
+const FONT_SIZES = ["12px", "14px", "16px", "18px", "20px", "24px", "28px", "32px", "36px", "48px"];
 
 interface ToolbarProps {
   editor: Editor | null;
 }
 
 const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showFontSizePicker, setShowFontSizePicker] = useState(false);
+  const colorPickerRef = useRef<HTMLDivElement>(null);
+  const fontSizePickerRef = useRef<HTMLDivElement>(null);
+
+  // Close pickers when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target as Node)) {
+        setShowColorPicker(false);
+      }
+      if (fontSizePickerRef.current && !fontSizePickerRef.current.contains(e.target as Node)) {
+        setShowFontSizePicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   if (!editor) {
     return null;
   }
@@ -46,6 +88,20 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
     }
 
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+  };
+
+  const setCurrentColor = (color: string) => {
+    if (color === "inherit") {
+      editor.chain().focus().unsetColor().run();
+    } else {
+      editor.chain().focus().setColor(color).run();
+    }
+    setShowColorPicker(false);
+  };
+
+  const setCurrentFontSize = (size: string) => {
+    editor.chain().focus().setFontSize(size).run();
+    setShowFontSizePicker(false);
   };
 
   return (
@@ -88,6 +144,132 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
         >
           <Highlighter size={16} />
         </button>
+        <button
+          onClick={() => editor.chain().focus().toggleSubscript().run()}
+          className={`toolbar-btn-circle ${editor.isActive("subscript") ? "is-active" : ""}`}
+          title="Subscript (Cmd+,)"
+        >
+          <SubscriptIcon size={16} />
+        </button>
+        <button
+          onClick={() => editor.chain().focus().toggleSuperscript().run()}
+          className={`toolbar-btn-circle ${editor.isActive("superscript") ? "is-active" : ""}`}
+          title="Superscript (Cmd+.)"
+        >
+          <SuperscriptIcon size={16} />
+        </button>
+
+        <div style={{ width: "1px", height: "24px", background: "rgba(255,255,255,0.1)", margin: "0 4px" }}></div>
+
+        {/* Color Picker */}
+        <div ref={colorPickerRef} style={{ position: "relative" }}>
+          <button
+            onClick={() => setShowColorPicker(!showColorPicker)}
+            className={`toolbar-btn-circle ${editor.isActive("textStyle") ? "is-active" : ""}`}
+            title="Text Color"
+          >
+            <Palette size={16} />
+          </button>
+          {showColorPicker && (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                marginTop: "8px",
+                background: "rgba(30, 30, 35, 0.95)",
+                backdropFilter: "blur(10px)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                borderRadius: "12px",
+                padding: "8px",
+                display: "grid",
+                gridTemplateColumns: "repeat(5, 1fr)",
+                gap: "4px",
+                zIndex: 100,
+                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
+              }}
+            >
+              {TEXT_COLORS.map((c) => (
+                <button
+                  key={c.color}
+                  onClick={() => setCurrentColor(c.color)}
+                  style={{
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "6px",
+                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    background: c.color === "inherit" ? "transparent" : c.color,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "10px",
+                    color: c.color === "inherit" ? "rgba(255,255,255,0.6)" : "#fff",
+                  }}
+                  title={c.name}
+                >
+                  {c.color === "inherit" ? "A" : ""}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Font Size Picker */}
+        <div ref={fontSizePickerRef} style={{ position: "relative" }}>
+          <button
+            onClick={() => setShowFontSizePicker(!showFontSizePicker)}
+            className="toolbar-btn-circle"
+            title="Font Size"
+          >
+            <Type size={16} />
+          </button>
+          {showFontSizePicker && (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                marginTop: "8px",
+                background: "rgba(30, 30, 35, 0.95)",
+                backdropFilter: "blur(10px)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                borderRadius: "12px",
+                padding: "8px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "2px",
+                zIndex: 100,
+                maxHeight: "200px",
+                overflowY: "auto",
+                boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
+              }}
+            >
+              {FONT_SIZES.map((size) => (
+                <button
+                  key={size}
+                  onClick={() => setCurrentFontSize(size)}
+                  style={{
+                    padding: "6px 12px",
+                    background: "transparent",
+                    border: "none",
+                    color: "rgba(255, 255, 255, 0.8)",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    borderRadius: "6px",
+                    textAlign: "left",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div style={{ width: "1px", height: "24px", background: "rgba(255,255,255,0.1)", margin: "0 4px" }}></div>
 
@@ -194,6 +376,24 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
           title="Justify"
         >
           <AlignJustify size={16} />
+        </button>
+
+        <div style={{ width: "1px", height: "24px", background: "rgba(255,255,255,0.1)", margin: "0 4px" }}></div>
+
+        {/* Indent/Outdent */}
+        <button
+          onClick={() => editor.chain().focus().outdent().run()}
+          className="toolbar-btn-circle"
+          title="Outdent (Shift+Tab)"
+        >
+          <IndentDecrease size={16} />
+        </button>
+        <button
+          onClick={() => editor.chain().focus().indent().run()}
+          className="toolbar-btn-circle"
+          title="Indent (Tab)"
+        >
+          <IndentIncrease size={16} />
         </button>
 
         <div style={{ width: "1px", height: "24px", background: "rgba(255,255,255,0.1)", margin: "0 4px" }}></div>
