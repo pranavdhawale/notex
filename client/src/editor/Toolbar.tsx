@@ -106,44 +106,47 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
   const alignmentPickerRef = useRef<HTMLDivElement>(null);
 
   // Get current formatting state reactively based on cursor position
-  const {
-    currentColor,
-    activeHeading,
-    activeAlignments,
-    isBold,
-    isItalic,
-    isStrike,
-    isUnderline,
-    isHighlight,
-    isSubscript,
-    isSuperscript,
-    isLink,
-    isBulletList,
-    isOrderedList,
-    isTaskList,
-    isBlockquote,
-    isCodeBlock,
-  } = useEditorState({
+  const editorState = useEditorState({
     editor,
     selector: ({ editor }) => ({
-      currentColor: editor.getAttributes("textStyle").color || null,
-      activeHeading: HEADINGS.find(h => editor.isActive("heading", { level: h.level })) || null,
-      activeAlignments: ALIGNMENTS.filter(a => editor.isActive({ textAlign: a.value })),
-      isBold: editor.isActive("bold"),
-      isItalic: editor.isActive("italic"),
-      isStrike: editor.isActive("strike"),
-      isUnderline: editor.isActive("underline"),
-      isHighlight: editor.isActive("highlight"),
-      isSubscript: editor.isActive("subscript"),
-      isSuperscript: editor.isActive("superscript"),
-      isLink: editor.isActive("link"),
-      isBulletList: editor.isActive("bulletList"),
-      isOrderedList: editor.isActive("orderedList"),
-      isTaskList: editor.isActive("taskList"),
-      isBlockquote: editor.isActive("blockquote"),
-      isCodeBlock: editor.isActive("codeBlock"),
+      currentColor: editor!.getAttributes("textStyle").color || null,
+      activeHeading: HEADINGS.find(h => editor!.isActive("heading", { level: h.level })) || null,
+      activeAlignments: ALIGNMENTS.filter(a => editor!.isActive({ textAlign: a.value })),
+      isBold: editor!.isActive("bold"),
+      isItalic: editor!.isActive("italic"),
+      isStrike: editor!.isActive("strike"),
+      isUnderline: editor!.isActive("underline"),
+      isHighlight: editor!.isActive("highlight"),
+      isSubscript: editor!.isActive("subscript"),
+      isSuperscript: editor!.isActive("superscript"),
+      isLink: editor!.isActive("link"),
+      isBulletList: editor!.isActive("bulletList"),
+      isOrderedList: editor!.isActive("orderedList"),
+      isTaskList: editor!.isActive("taskList"),
+      isBlockquote: editor!.isActive("blockquote"),
+      isCodeBlock: editor!.isActive("codeBlock"),
     }),
   });
+
+  // Destructure with defaults for when editor is null
+  const {
+    currentColor = null,
+    activeHeading = null,
+    activeAlignments = [],
+    isBold = false,
+    isItalic = false,
+    isStrike = false,
+    isUnderline = false,
+    isHighlight = false,
+    isSubscript = false,
+    isSuperscript = false,
+    isLink = false,
+    isBulletList = false,
+    isOrderedList = false,
+    isTaskList = false,
+    isBlockquote = false,
+    isCodeBlock = false,
+  } = editorState || {};
 
   // Close pickers when clicking outside
   useEffect(() => {
