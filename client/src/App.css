@@ -175,3 +175,57 @@
     font-size: 13px;
   }
 }
+
+/* ========================================
+   NAME PROMPT (Username Entry)
+   ======================================== */
+
+.name-prompt-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-gradient);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.name-prompt-card {
+  width: 400px;
+  padding: 40px;
+}
+
+.name-prompt-title {
+  color: var(--text-main);
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 1.5rem;
+}
+
+.name-prompt-actions {
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.btn-full-width {
+  width: 100%;
+}
+
+/* ========================================
+   CENTER CONTAINER (Loading/Error States)
+   ======================================== */
+
+.center-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  color: var(--text-main);
+}
+
+.center-content {
+  text-align: center;
+}
