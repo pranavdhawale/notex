@@ -21,12 +21,18 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 
 ### 🎨 Rich Text Editing
 
-- **Full-Featured Editor**: Powered by Tiptap (ProseMirror)
-- **Formatting**: Bold, italic, underline, headings, lists, code blocks
-- **Tables**: Create and edit tables inline
+- **Full-Featured Editor**: Powered by Tiptap v3 (ProseMirror)
+- **Text Formatting**: Bold, italic, underline, strikethrough, highlight
+- **Subscript & Superscript**: Scientific and mathematical notation
+- **Text Color**: Apply colors to selected text
+- **Headings**: H1, H2, H3 with paragraph support
+- **Lists**: Bullet, ordered, and task lists with indentation
+- **Code Blocks**: Syntax-highlighted code blocks
+- **Blockquotes**: Quote blocks for citations
+- **Tables**: Create and edit tables inline with context menu
 - **Links**: Add and manage hyperlinks
-- **Task Lists**: Interactive checkboxes for to-do items
 - **Text Alignment**: Left, center, right, justify
+- **Indentation**: Tab/Shift+Tab for indent/outdent
 
 ### 🤝 Real-Time Collaboration
 
@@ -64,11 +70,16 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 ### ⌨️ Keyboard Shortcuts
 
 - **Quick Actions**: Comprehensive keyboard shortcuts for all editor operations
-- **Formatting**: Bold (Ctrl+B), Italic (Ctrl+I), Strikethrough, Underline (Ctrl+U)
-- **Headings**: Ctrl+Alt+1/2/3 for H1/H2/H3
+- **Text Formatting**:
+  - Bold (Ctrl+B), Italic (Ctrl+I), Underline (Ctrl+U)
+  - Strikethrough (Ctrl+Shift+X), Highlight (Ctrl+Shift+H)
+  - Subscript (Ctrl+,), Superscript (Ctrl+.)
+- **Headings**: Ctrl+Alt+1/2/3 for H1/H2/H3, Ctrl+Alt+0 for Paragraph
 - **Lists**: Bullet list (Ctrl+Shift+8), Ordered list (Ctrl+Shift+7)
-- **Blocks**: Blockquote (Ctrl+Shift+B), Code block (Ctrl+Alt+C)
-- **Navigation**: Save (Ctrl+S), Lock/Unlock (Ctrl+L), Shortcuts help (Ctrl+/)
+- **Blocks**: Blockquote (Ctrl+Shift+B), Code block (Ctrl+Alt+C), Horizontal rule (Ctrl+Alt+-)
+- **Indentation**: Indent (Tab), Outdent (Shift+Tab)
+- **Other**: Link (Ctrl+K), Hard break (Shift+Enter)
+- **Navigation**: Save snapshot (Ctrl+S), Lock/Unlock (Ctrl+L), Shortcuts help (Ctrl+/)
 
 ### 🖱️ Table Editing
 
@@ -85,7 +96,7 @@ Notex isn't just a toy; it's an architectural showcase.
 
 - **React 19 + Vite**: Blazing fast builds and HMR
 - **TypeScript**: Type-safe development
-- **Tiptap**: Headless wrapper for ProseMirror, full editor control
+- **Tiptap v3**: Headless wrapper for ProseMirror, full editor control with reactive state
 - **Yjs**: CRDT library for conflict-free real-time collaboration
 - **OGL**: Ultra-lightweight WebGL library for the particle system
 - **Lucide React**: Beautiful icon library
