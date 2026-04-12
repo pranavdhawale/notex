@@ -19,6 +19,9 @@ const (
 
 	// Maximum message size allowed from peer.
 	maxMessageSize = 512 * 1024 // 512KB for large syncs
+
+	// Client send buffer size - increased for high-frequency collaborative editing
+	clientSendBufferSize = 1024
 )
 
 type Client struct {

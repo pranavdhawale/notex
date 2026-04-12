@@ -82,7 +82,9 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
   const fetchFiles = useCallback(async () => {
     try {
       const res = await api.get(`/api/rooms/${roomSlug}/files`);
-      setFiles(Array.isArray(res.data) ? res.data : []);
+      // API returns { files: [...], pagination: {...} }
+      const filesData = res.data.files || res.data;
+      setFiles(Array.isArray(filesData) ? filesData : []);
     } catch (e) {
       console.error(e);
       setFiles([]);
@@ -194,6 +196,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
 
     let lastLoaded = 0;
     let lastTime = Date.now();
+    let lastUpdateTime = 0; // Throttle state updates
 
     try {
       const res = await api.post(`/api/upload/${roomSlug}`, formData, {
@@ -206,8 +209,15 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
           const total = progressEvent.total || file.size;
           const current = progressEvent.loaded;
           const percentCompleted = Math.round((current * 100) / total);
-
           const now = Date.now();
+
+          // Throttle state updates to 200ms to prevent excessive re-renders
+          const timeSinceLastUpdate = now - lastUpdateTime;
+          if (timeSinceLastUpdate < 200 && percentCompleted < 100) {
+            return;
+          }
+          lastUpdateTime = now;
+
           const timeDiff = (now - lastTime) / 1000; // seconds
 
           let speedStr = "Calculating...";

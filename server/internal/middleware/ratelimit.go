@@ -2,16 +2,25 @@ package middleware
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+// Metrics tracks rate limiter statistics
+type Metrics struct {
+	Allowed   int64
+	Rejected  int64
+	Total     int64
+}
 
 // RateLimiter provides in-memory rate limiting using a sliding window
 type RateLimiter struct {
 	requests    sync.Map // map[string]*requestCount
 	maxRequests int
 	windowSize  time.Duration
+	metrics     Metrics
 }
 
 type requestCount struct {
@@ -48,13 +57,27 @@ func (r *RateLimiter) Allow(key string) bool {
 		counter.windowStart = now
 	}
 
+	// Track metrics
+	atomic.AddInt64(&r.metrics.Total, 1)
+
 	// Check if within limit
 	if counter.count >= r.maxRequests {
+		atomic.AddInt64(&r.metrics.Rejected, 1)
 		return false
 	}
 
 	counter.count++
+	atomic.AddInt64(&r.metrics.Allowed, 1)
 	return true
+}
+
+// GetMetrics returns current metrics for this rate limiter
+func (r *RateLimiter) GetMetrics() Metrics {
+	return Metrics{
+		Allowed:  atomic.LoadInt64(&r.metrics.Allowed),
+		Rejected: atomic.LoadInt64(&r.metrics.Rejected),
+		Total:    atomic.LoadInt64(&r.metrics.Total),
+	}
 }
 
 // Cleanup removes old entries periodically
@@ -76,10 +99,13 @@ var (
 	// File uploads: 10 per room+user per minute
 	UploadLimiter = NewRateLimiter(10, time.Minute)
 
+	// File downloads: 30 per room+user per minute (higher limit for downloads)
+	DownloadLimiter = NewRateLimiter(30, time.Minute)
+
 	// Room creation: 5 per IP per minute
 	RoomLimiter = NewRateLimiter(5, time.Minute)
 
-	// Room save: 30 per room per minute (aut-save is frequent)
+	// Room save: 30 per room per minute (auto-save is frequent)
 	SaveLimiter = NewRateLimiter(30, time.Minute)
 
 	// Password verification: 5 attempts per IP+room per minute
@@ -157,9 +183,53 @@ func RateLimitPassword() gin.HandlerFunc {
 	}
 }
 
+// RateLimitDownload limits file download requests per room+user
+func RateLimitDownload() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		room := c.Param("room")
+		userID := c.GetString("userID")
+
+		// Key combines room and user for per-room-per-user limiting
+		// Falls back to IP if userID is not set
+		key := room + ":" + userID
+		if userID == "" {
+			key = room + ":" + c.ClientIP()
+		}
+
+		if !DownloadLimiter.Allow(key) {
+			c.JSON(429, gin.H{
+				"error": "Too many downloads for this room. Please wait a moment and try again.",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // Shutdown stops the cleanup goroutine
 func Shutdown() {
 	close(shutdownCh)
+}
+
+// AllMetrics returns metrics for all rate limiters
+type AllMetrics struct {
+	Upload   Metrics
+	Download Metrics
+	Room     Metrics
+	Save     Metrics
+	Password Metrics
+}
+
+// GetAllMetrics returns metrics for all rate limiters
+func GetAllMetrics() AllMetrics {
+	return AllMetrics{
+		Upload:   UploadLimiter.GetMetrics(),
+		Download: DownloadLimiter.GetMetrics(),
+		Room:     RoomLimiter.GetMetrics(),
+		Save:     SaveLimiter.GetMetrics(),
+		Password: PasswordLimiter.GetMetrics(),
+	}
 }
 
 // init starts cleanup goroutine with proper shutdown handling
@@ -172,6 +242,7 @@ func init() {
 			select {
 			case <-ticker.C:
 				UploadLimiter.Cleanup()
+				DownloadLimiter.Cleanup()
 				RoomLimiter.Cleanup()
 				SaveLimiter.Cleanup()
 				PasswordLimiter.Cleanup()

@@ -13,6 +13,65 @@ import (
 var MongoClient *mongo.Client
 var MongoDatabase *mongo.Database
 
+// createIndexes creates all required indexes asynchronously
+// This is called in a goroutine after successful connection
+func createIndexes() {
+	indexCtx, indexCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer indexCancel()
+
+	// Create TTL Index for Rooms Collection
+	roomsCollection := MongoDatabase.Collection("rooms")
+	roomTTLIndexModel := mongo.IndexModel{
+		Keys:    bson.M{"expire_at": 1},
+		Options: options.Index().SetExpireAfterSeconds(0),
+	}
+
+	_, err := roomsCollection.Indexes().CreateOne(indexCtx, roomTTLIndexModel)
+	if err != nil {
+		log.Printf("Warning: Failed to create rooms TTL index: %v", err)
+	} else {
+		log.Println("TTL Index created on rooms.expire_at")
+	}
+
+	// Create unique index on rooms.slug for fast lookups
+	slugIndexModel := mongo.IndexModel{
+		Keys:    bson.M{"slug": 1},
+		Options: options.Index().SetUnique(true),
+	}
+	_, err = roomsCollection.Indexes().CreateOne(indexCtx, slugIndexModel)
+	if err != nil {
+		log.Printf("Warning: Failed to create rooms.slug index: %v", err)
+	} else {
+		log.Println("Unique Index created on rooms.slug")
+	}
+
+	// Create TTL Index for Files Collection
+	// Files expire at the same time as their parent room
+	filesCollection := MongoDatabase.Collection("files")
+	fileTTLIndexModel := mongo.IndexModel{
+		Keys:    bson.M{"expire_at": 1},
+		Options: options.Index().SetExpireAfterSeconds(0),
+	}
+
+	_, err = filesCollection.Indexes().CreateOne(indexCtx, fileTTLIndexModel)
+	if err != nil {
+		log.Printf("Warning: Failed to create files TTL index: %v", err)
+	} else {
+		log.Println("TTL Index created on files.expire_at")
+	}
+
+	// Create index on files.room_id for fast file lookups
+	roomIDIndexModel := mongo.IndexModel{
+		Keys: bson.M{"room_id": 1},
+	}
+	_, err = filesCollection.Indexes().CreateOne(indexCtx, roomIDIndexModel)
+	if err != nil {
+		log.Printf("Warning: Failed to create files.room_id index: %v", err)
+	} else {
+		log.Println("Index created on files.room_id")
+	}
+}
+
 func InitMongo(uri string, dbName string) {
 	maxRetries := 30
 	retryDelay := 2 * time.Second
@@ -23,7 +82,15 @@ func InitMongo(uri string, dbName string) {
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
-		client, err = mongo.Connect(ctx, options.Client().ApplyURI(uri))
+		// Configure connection pool for production workloads
+		clientOptions := options.Client().
+			ApplyURI(uri).
+			SetMaxPoolSize(100).
+			SetMinPoolSize(10).
+			SetMaxConnIdleTime(30 * time.Second).
+			SetConnectTimeout(10 * time.Second)
+
+		client, err = mongo.Connect(ctx, clientOptions)
 		if err != nil {
 			cancel()
 			log.Printf("Failed to create Mongo client (attempt %d/%d): %v", attempt, maxRetries, err)
@@ -44,37 +111,8 @@ func InitMongo(uri string, dbName string) {
 		MongoClient = client
 		MongoDatabase = client.Database(dbName)
 
-		// Create TTL Index for Rooms Collection
-		roomsCollection := MongoDatabase.Collection("rooms")
-		roomIndexModel := mongo.IndexModel{
-			Keys:    bson.M{"expire_at": 1},
-			Options: options.Index().SetExpireAfterSeconds(0), // Expire exactly at the time specified in expire_at
-		}
-
-		indexCtx, indexCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		_, err = roomsCollection.Indexes().CreateOne(indexCtx, roomIndexModel)
-		if err != nil {
-			log.Printf("Failed to create rooms TTL index: %v", err)
-		} else {
-			log.Println("TTL Index created on rooms.expire_at")
-		}
-
-		// Create TTL Index for Files Collection
-		// Files expire at the same time as their parent room
-		filesCollection := MongoDatabase.Collection("files")
-		fileIndexModel := mongo.IndexModel{
-			Keys:    bson.M{"expire_at": 1},
-			Options: options.Index().SetExpireAfterSeconds(0), // Expire exactly at the time specified in expire_at
-		}
-
-		_, err = filesCollection.Indexes().CreateOne(indexCtx, fileIndexModel)
-		indexCancel()
-
-		if err != nil {
-			log.Printf("Failed to create files TTL index: %v", err)
-		} else {
-			log.Println("TTL Index created on files.expire_at")
-		}
+		// Create indexes asynchronously to not block server startup
+		go createIndexes()
 
 		log.Println("Connected to MongoDB")
 		return

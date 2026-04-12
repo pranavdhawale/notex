@@ -2,14 +2,12 @@ import { useParams } from "react-router-dom";
 import { Editor } from "./editor/Editor";
 import { LandingPage } from "./LandingPage";
 import { PasswordPrompt } from "./components/PasswordPrompt";
-import { getUserID } from "./utils/session";
+import { getUserID, getUsername, setUsername } from "./utils/session";
 import "./App.css";
 
 const EditorRoute = () => {
   const { roomSlug } = useParams<{ roomSlug: string }>();
-  const [username, setUsername] = useState(
-    localStorage.getItem("notex_username") || ""
-  );
+  const [username, setLocalUsername] = useState(() => getUsername() || "");
   const [tempName, setTempName] = useState("");
   const [isOwner, setIsOwner] = useState(false);
   const [roomLocked, setRoomLocked] = useState(false);
@@ -20,11 +18,14 @@ const EditorRoute = () => {
   // Fetch room details including lock status
   useEffect(() => {
     if (roomSlug) {
+      const controller = new AbortController();
+
       const userID = getUserID();
       fetch(
         `${
           import.meta.env.VITE_API_URL || "http://localhost:8080"
-        }/api/rooms/${roomSlug}`
+        }/api/rooms/${roomSlug}`,
+        { signal: controller.signal }
       )
         .then((res) => {
           if (!res.ok) {
@@ -44,9 +45,13 @@ const EditorRoute = () => {
           setRoomChecked(true);
         })
         .catch((err) => {
+          // Ignore cancellation errors
+          if (err.name === 'AbortError') return;
           console.error("Failed to fetch room details", err);
           setRoomChecked(true);
         });
+
+      return () => controller.abort();
     }
   }, [roomSlug]);
 
@@ -63,36 +68,20 @@ const EditorRoute = () => {
     }
   };
 
+  // Handle username submission
+  const handleSubmitUsername = () => {
+    if (tempName.trim()) {
+      setUsername(tempName.trim());
+      setLocalUsername(tempName.trim());
+    }
+  };
+
   // Name prompt
   if (!username) {
     return (
-      <div
-        className="name-prompt-overlay"
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: "var(--bg-gradient)",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          zIndex: 1000,
-        }}
-      >
-        {/* Reuse glass-card styling from LandingPage */}
-        <div className="glass-card" style={{ width: "400px", padding: "40px" }}>
-          <h2
-            style={{
-              color: "var(--text-main)",
-              marginBottom: "20px",
-              textAlign: "center",
-              fontSize: "1.5rem",
-            }}
-          >
-            Enter your name to join
-          </h2>
+      <div className="name-prompt-overlay">
+        <div className="glass-card name-prompt-card">
+          <h2 className="name-prompt-title">Enter your name to join</h2>
 
           <div className="input-group">
             <input
@@ -102,8 +91,7 @@ const EditorRoute = () => {
               onChange={(e) => setTempName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && tempName.trim()) {
-                  localStorage.setItem("notex_username", tempName.trim());
-                  setUsername(tempName.trim());
+                  handleSubmitUsername();
                 }
               }}
               className="glass-input"
@@ -111,20 +99,11 @@ const EditorRoute = () => {
             />
           </div>
 
-          <div
-            className="actions"
-            style={{ justifyContent: "center", marginTop: "20px" }}
-          >
+          <div className="actions name-prompt-actions">
             <button
-              onClick={() => {
-                if (tempName.trim()) {
-                  localStorage.setItem("notex_username", tempName.trim());
-                  setUsername(tempName.trim());
-                }
-              }}
+              onClick={handleSubmitUsername}
               disabled={!tempName.trim()}
-              className="btn-primary"
-              style={{ width: "100%" }}
+              className="btn-primary btn-full-width"
             >
               Join Room
             </button>
@@ -139,16 +118,8 @@ const EditorRoute = () => {
   // Room not found
   if (roomChecked && !roomExists) {
     return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-          color: "var(--text-main)",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
+      <div className="center-container">
+        <div className="center-content">
           <h2>Room Not Found</h2>
           <p>This room may have expired or been deleted.</p>
         </div>
@@ -159,15 +130,7 @@ const EditorRoute = () => {
   // Still loading room info
   if (!roomChecked) {
     return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-          color: "var(--text-main)",
-        }}
-      >
+      <div className="center-container">
         <div>Loading...</div>
       </div>
     );

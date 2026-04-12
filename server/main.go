@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -51,7 +53,14 @@ func main() {
 
 	// Start background cleanup for orphaned files (runs every hour)
 	// This handles cases where MongoDB TTL expires rooms but MinIO files remain
-	cleanup.StartOrphanedFilesCleanup(1 * time.Hour)
+	cleanupStopCh := cleanup.StartOrphanedFilesCleanup(1 * time.Hour)
+
+	// Start room cache cleanup (runs every 10 minutes)
+	// Removes expired room entries from in-memory cache
+	roomCacheStopCh := state.StartRoomCacheCleanup(10 * time.Minute)
+
+	// Start WebSocket Hub
+	go ws.MainHub.Run()
 
 	r := gin.Default()
 
@@ -112,13 +121,10 @@ func main() {
 		// File upload - rate limited: 10 uploads per room per user per minute
 		protected.POST("/upload/:room", middleware.RateLimitUpload(), api.UploadFile)
 		protected.GET("/rooms/:room/files", api.ListFiles)
-		protected.GET("/rooms/:room/files/:fileId/download", api.DownloadFile)
+		protected.GET("/rooms/:room/files/:fileId/download", middleware.RateLimitDownload(), api.DownloadFile)
 		protected.DELETE("/rooms/:room/files", api.DeleteAllFiles)
 		protected.DELETE("/rooms/:room/files/:fileId", api.DeleteFile)
 	}
-
-	// Start WebSocket Hub
-	go ws.MainHub.Run()
 
 	// WebSocket Route
 	r.GET("/ws/:room", func(c *gin.Context) {
@@ -138,8 +144,40 @@ func main() {
 		MaxHeaderBytes: 1 << 20,
 	}
 
-	log.Printf("Server starting on port %s", port)
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Failed to run server: %v", err)
+	// Graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	// Start server in goroutine
+	go func() {
+		log.Printf("Server starting on port %s", port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to run server: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal
+	<-quit
+	log.Println("Shutting down server...")
+
+	// Stop background services
+	ws.MainHub.Stop()
+	close(cleanupStopCh)
+	close(roomCacheStopCh)
+
+	// Stop rate limiter cleanup goroutine
+	middleware.Shutdown()
+
+	// Stop token store cleanup goroutine
+	state.AuthTokens.Shutdown()
+
+	// Give connections time to finish
+	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("Server forced to shutdown: %v", err)
 	}
+
+	log.Println("Server exited")
 }

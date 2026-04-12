@@ -2,8 +2,10 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
+	"strings"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -72,21 +74,69 @@ func (m *MinIOClient) Delete(ctx context.Context, objectName string) error {
 }
 
 // DeleteByPrefix removes all files with a given prefix (e.g., all files in a room)
+// Uses streaming to avoid memory bloat - pipes ListObjects directly to RemoveObjects
 func (m *MinIOClient) DeleteByPrefix(ctx context.Context, prefix string) error {
+	// List objects with prefix
 	objectsCh := m.client.ListObjects(ctx, m.bucket, minio.ListObjectsOptions{
 		Prefix:    prefix,
 		Recursive: true,
 	})
 
-	for obj := range objectsCh {
-		if obj.Err != nil {
-			return obj.Err
+	// Pipe objects directly to RemoveObjects channel (streaming, no memory accumulation)
+	deleteCh := make(chan minio.ObjectInfo)
+	var listErr error
+
+	go func() {
+		defer close(deleteCh)
+		for obj := range objectsCh {
+			if obj.Err != nil {
+				listErr = obj.Err
+				return
+			}
+			deleteCh <- obj
 		}
-		if err := m.client.RemoveObject(ctx, m.bucket, obj.Key, minio.RemoveObjectOptions{}); err != nil {
-			return err
+	}()
+
+	// Collect errors from batch deletion
+	errorCh := m.client.RemoveObjects(ctx, m.bucket, deleteCh, minio.RemoveObjectsOptions{})
+	for err := range errorCh {
+		if err.Err != nil {
+			log.Printf("Warning: failed to delete object %s: %v", err.ObjectName, err.Err)
 		}
 	}
 
+	return listErr
+}
+
+// DeleteBatch removes multiple files in a single batch operation.
+// Returns nil if all deletions succeed, or an aggregated error if any fail.
+func (m *MinIOClient) DeleteBatch(ctx context.Context, objectNames []string) error {
+	if len(objectNames) == 0 {
+		return nil
+	}
+
+	// Create ObjectInfo channel for batch deletion
+	deleteCh := make(chan minio.ObjectInfo, len(objectNames))
+	go func() {
+		for _, name := range objectNames {
+			deleteCh <- minio.ObjectInfo{Key: name}
+		}
+		close(deleteCh)
+	}()
+
+	errorCh := m.client.RemoveObjects(ctx, m.bucket, deleteCh, minio.RemoveObjectsOptions{})
+
+	var errors []string
+	for err := range errorCh {
+		if err.Err != nil {
+			log.Printf("Warning: failed to delete object %s: %v", err.ObjectName, err.Err)
+			errors = append(errors, fmt.Sprintf("%s: %v", err.ObjectName, err.Err))
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("failed to delete %d objects: %s", len(errors), strings.Join(errors, "; "))
+	}
 	return nil
 }
 

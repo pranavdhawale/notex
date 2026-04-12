@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -22,31 +23,9 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
 
-		// Get allowed origins from environment
-		allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
-		if allowedOriginsEnv == "" {
-			// Default to client origin or localhost for development
-			clientOrigin := os.Getenv("CLIENT_ORIGIN")
-			if clientOrigin == "" {
-				clientOrigin = "http://localhost:5173"
-			}
-			allowedOriginsEnv = clientOrigin
-		}
-
-		// In development mode, allow localhost variations
-		ginMode := os.Getenv("GIN_MODE")
-		if ginMode != "release" {
-			// Allow any localhost origin in development
-			if strings.HasPrefix(origin, "http://localhost") ||
-				strings.HasPrefix(origin, "http://127.0.0.1") {
-				return true
-			}
-		}
-
-		// Check against allowed origins
-		allowedOrigins := strings.Split(allowedOriginsEnv, ",")
+		// Check against cached allowed origins
+		allowedOrigins := getAllowedOrigins()
 		for _, allowed := range allowedOrigins {
-			allowed = strings.TrimSpace(allowed)
 			if origin == allowed {
 				return true
 			}
@@ -56,9 +35,51 @@ var upgrader = websocket.Upgrader{
 			}
 		}
 
+		// In development mode, allow localhost variations
+		if isDevelopment() {
+			if strings.HasPrefix(origin, "http://localhost") ||
+				strings.HasPrefix(origin, "http://127.0.0.1") {
+				return true
+			}
+		}
+
 		log.Printf("WebSocket connection rejected from origin: %s", origin)
 		return false
 	},
+}
+
+// Cached allowed origins - initialized once at startup
+var (
+	allowedOriginsCache     []string
+	allowedOriginsCacheOnce sync.Once
+	isDevelopmentMode       bool
+)
+
+// getAllowedOrigins returns cached allowed origins
+func getAllowedOrigins() []string {
+	allowedOriginsCacheOnce.Do(func() {
+		allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
+		if allowedOriginsEnv == "" {
+			clientOrigin := os.Getenv("CLIENT_ORIGIN")
+			if clientOrigin == "" {
+				clientOrigin = "http://localhost:5173"
+			}
+			allowedOriginsEnv = clientOrigin
+		}
+		allowedOriginsCache = strings.Split(allowedOriginsEnv, ",")
+		for i, origin := range allowedOriginsCache {
+			allowedOriginsCache[i] = strings.TrimSpace(origin)
+		}
+	})
+	return allowedOriginsCache
+}
+
+// isDevelopment returns true if running in development mode
+func isDevelopment() bool {
+	allowedOriginsCacheOnce.Do(func() {
+		isDevelopmentMode = os.Getenv("GIN_MODE") != "release"
+	})
+	return isDevelopmentMode
 }
 
 // Main Hub instance (singleton for now)
@@ -79,26 +100,47 @@ func ServeWs(hub *Hub, c *gin.Context) {
 	// This is optional - the userID is also sent via X-User-ID header in HTTP requests
 	_ = c.Query("userID") // Currently unused but available for future features
 
-	// CHECK: Verify room exists in DB
-	collection := state.MongoDatabase.Collection("rooms")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// CHECK: Verify room exists (use cache first, fallback to DB)
+	roomCache := state.GetRoomCache()
+	cachedInfo := roomCache.Get(roomID)
 
 	var room models.Room
-	err := collection.FindOne(ctx, bson.M{"slug": roomID}).Decode(&room)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			log.Printf("Attempt to connect to non-existent room: %s", roomID)
-			http.Error(c.Writer, "Room not found", http.StatusNotFound)
+	var locked bool
+
+	if cachedInfo != nil {
+		// Cache hit - use cached data
+		locked = cachedInfo.Locked
+	} else {
+		// Cache miss - query database
+		collection := state.MongoDatabase.Collection("rooms")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+		err := collection.FindOne(ctx, bson.M{"slug": roomID}).Decode(&room)
+		cancel()
+
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				log.Printf("Attempt to connect to non-existent room: %s", roomID)
+				http.Error(c.Writer, "Room not found", http.StatusNotFound)
+				return
+			}
+			log.Printf("Database error checking room %s: %v", roomID, err)
+			http.Error(c.Writer, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		log.Printf("Database error checking room %s: %v", roomID, err)
-		http.Error(c.Writer, "Internal server error", http.StatusInternalServerError)
-		return
+
+		locked = room.Locked
+
+		// Cache the result for future connections
+		roomCache.Set(roomID, &state.RoomInfo{
+			Exists:   true,
+			Locked:   room.Locked,
+			ExpireAt: room.ExpireAt,
+		})
 	}
 
 	// CHECK: If room is locked, validate auth token
-	if room.Locked {
+	if locked {
 		authToken := c.Query("authToken")
 		if authToken == "" {
 			log.Printf("Attempt to connect to locked room without token: %s", roomID)
@@ -122,7 +164,8 @@ func ServeWs(hub *Hub, c *gin.Context) {
 		return
 	}
 
-	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256), roomID: roomID}
+	// Use the constant buffer size defined in client.go
+	client := &Client{hub: hub, conn: conn, send: make(chan []byte, clientSendBufferSize), roomID: roomID}
 	client.hub.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in

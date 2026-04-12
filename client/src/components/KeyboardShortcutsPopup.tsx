@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { isMacOS } from "../utils/platform";
 import "./KeyboardShortcutsPopup.css";
 
 interface KeyboardShortcutsPopupProps {
@@ -8,7 +9,7 @@ interface KeyboardShortcutsPopupProps {
   onClose: () => void;
 }
 
-const isMac = typeof navigator !== "undefined" && navigator.platform.toUpperCase().includes("MAC");
+const isMac = isMacOS();
 const modKey = isMac ? "Cmd" : "Ctrl";
 
 const shortcutGroups = [

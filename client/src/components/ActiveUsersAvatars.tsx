@@ -22,6 +22,17 @@ interface AwarenessState {
   };
 }
 
+// Helper to compare user arrays and avoid unnecessary re-renders
+function areUsersEqual(a: UserData[], b: UserData[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].userId !== b[i].userId || a[i].name !== b[i].name || a[i].color !== b[i].color) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export const ActiveUsersAvatars: React.FC<ActiveUsersAvatarsProps> = ({
   provider,
 }) => {
@@ -42,7 +53,15 @@ export const ActiveUsersAvatars: React.FC<ActiveUsersAvatarsProps> = ({
         }
       });
 
-      setUsers(Array.from(uniqueUsers.values()));
+      const newUsers = Array.from(uniqueUsers.values());
+
+      // Only update state if users actually changed
+      setUsers((prevUsers) => {
+        if (areUsersEqual(prevUsers, newUsers)) {
+          return prevUsers; // Return same reference to prevent re-render
+        }
+        return newUsers;
+      });
     };
 
     provider.awareness.on("change", updateUsers);
