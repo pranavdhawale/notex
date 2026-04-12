@@ -2,18 +2,21 @@ import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle, us
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Collaboration from "@tiptap/extension-collaboration";
-import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
+import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
 // Extensions
 import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
+import Subscript from "@tiptap/extension-subscript";
+import Superscript from "@tiptap/extension-superscript";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
-import Table from "@tiptap/extension-table";
-import TableRow from "@tiptap/extension-table-row";
-import TableCell from "@tiptap/extension-table-cell";
-import TableHeader from "@tiptap/extension-table-header";
+import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
 import TextAlign from "@tiptap/extension-text-align";
+import { TextStyle } from "@tiptap/extension-text-style";
+import { Color } from "@tiptap/extension-color";
+import { FontSize } from "./extensions/FontSize";
+import { Indent } from "./extensions/Indent";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 
@@ -87,17 +90,21 @@ const TiptapEditor = forwardRef<EditorRef, {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        history: false,
+        undoRedo: false,  // Renamed from 'history' in v3
+        link: false,      // Disable default, using custom config below
+        underline: false, // Disable default, using separate import below
       }),
       Collaboration.configure({
         document: provider.doc,
       }),
-      CollaborationCursor.configure({
+      CollaborationCaret.configure({
         provider: provider,
         user: userDetails,
       }),
       Underline,
       Highlight,
+      Subscript,
+      Superscript,
       TaskList,
       TaskItem.configure({ nested: true }),
       Link.configure({ openOnClick: false }),
@@ -106,7 +113,21 @@ const TiptapEditor = forwardRef<EditorRef, {
       TableHeader,
       TableCell,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
+      TextStyle,
+      Color,
+      FontSize,
+      Indent.configure({
+        types: ["listItem", "paragraph", "heading"],
+        minLevel: 0,
+        maxLevel: 8,
+        indentRange: 24,
+      }),
     ],
+
+    // v3 Performance Options:
+    shouldRerenderOnTransaction: false,  // Prevents re-renders on cursor movements
+    immediatelyRender: true,              // Render immediately (good for UX)
+
     editorProps: {
       attributes: {
         class: "ProseMirror",

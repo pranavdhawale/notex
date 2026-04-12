@@ -183,6 +183,33 @@
   min-height: 100%; /* Allow content to grow */
 }
 
+/* --- Safari Performance Optimizations --- */
+
+/* 1. CSS Containment - isolate editor from page reflows */
+.editor-main {
+  contain: layout paint style;
+}
+
+/* 2. Additional ProseMirror performance */
+.ProseMirror {
+  contain: content;
+  /* Force GPU acceleration */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  /* Prevent input lag on Safari */
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Fix WebKit optical sizing freeze */
+  font-optical-sizing: none;
+}
+
+/* 3. Contain sidebar panels */
+.sidebar-panel {
+  contain: layout paint style;
+}
+
+
 /* Custom Scrollbar for editor wrapper — auto-hiding */
 .editor-container > div::-webkit-scrollbar {
   width: 6px;
@@ -490,6 +517,16 @@
   pointer-events: none;
 }
 
+/* --- Indent Styles --- */
+.ProseMirror [data-indent="1"] { margin-left: 24px; }
+.ProseMirror [data-indent="2"] { margin-left: 48px; }
+.ProseMirror [data-indent="3"] { margin-left: 72px; }
+.ProseMirror [data-indent="4"] { margin-left: 96px; }
+.ProseMirror [data-indent="5"] { margin-left: 120px; }
+.ProseMirror [data-indent="6"] { margin-left: 144px; }
+.ProseMirror [data-indent="7"] { margin-left: 168px; }
+.ProseMirror [data-indent="8"] { margin-left: 192px; }
+
 /* --- Files Styling --- */
 .files-list {
   flex: 1;
@@ -507,8 +544,8 @@
   background: transparent;
 }
 
-/* --- Collaboration Cursor Fix --- */
-.collaboration-cursor__caret {
+/* --- Collaboration Caret Fix --- */
+.collaboration-caret__caret {
   position: relative;
   margin-left: -1px;
   margin-right: -1px;
@@ -518,7 +555,7 @@
   pointer-events: none;
 }
 
-.collaboration-cursor__label {
+.collaboration-caret__label {
   position: absolute;
   top: -1.4em;
   left: -1px;
