@@ -55,6 +55,16 @@ export const FILE_UPLOAD = {
 } as const;
 
 /**
+ * Image upload configuration for inline editor images
+ */
+export const IMAGE_UPLOAD = {
+  /** Maximum image file size in bytes (10MB) */
+  MAX_SIZE: 10 * 1024 * 1024,
+  /** Allowed MIME types for inline image paste/drop */
+  ALLOWED_MIME_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const,
+} as const;
+
+/**
  * Cache configuration
  */
 export const CACHE_CONFIG = {
