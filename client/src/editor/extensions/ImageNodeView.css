@@ -1,0 +1,131 @@
+/* Image Node View Styles */
+
+.image-node-wrapper {
+  display: flex;
+  justify-content: center;
+  margin: 0.5em 0;
+}
+
+.image-node-container {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.image-node-img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+}
+
+.image-node-img.image-uploading {
+  opacity: 0.7;
+}
+
+/* Upload progress overlay */
+.image-upload-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  gap: 8px;
+}
+
+.image-upload-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: image-spin 0.8s linear infinite;
+}
+
+@keyframes image-spin {
+  to { transform: rotate(360deg); }
+}
+
+.image-upload-progress-bar {
+  width: 60%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.image-upload-progress-fill {
+  height: 100%;
+  background: #fff;
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+
+.image-upload-percent {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Loading placeholder (for authenticated fetch) */
+.image-loading-placeholder {
+  width: 100%;
+  min-width: 200px;
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.05));
+  border-radius: 8px;
+  border: 1px dashed var(--glass-border, rgba(255, 255, 255, 0.1));
+}
+
+.image-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+  border-top-color: var(--accent-color, #70CFF8);
+  border-radius: 50%;
+  animation: image-spin 0.8s linear infinite;
+}
+
+/* Error overlay */
+.image-error-overlay {
+  width: 100%;
+  min-width: 200px;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(249, 129, 129, 0.1);
+  border: 1px solid rgba(249, 129, 129, 0.3);
+  border-radius: 8px;
+}
+
+.image-error-text {
+  color: #F98181;
+  font-size: 13px;
+}
+
+.image-error-retry {
+  background: rgba(249, 129, 129, 0.2);
+  color: #F98181;
+  border: 1px solid rgba(249, 129, 129, 0.4);
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.image-error-retry:hover {
+  background: rgba(249, 129, 129, 0.3);
+}
