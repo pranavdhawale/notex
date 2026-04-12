@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import api from '../../utils/api'
 import './ImageNodeView.css'
 
-export function ImageNodeView({ node, updateAttributes }: NodeViewProps) {
+export function ImageNodeView({ node }: NodeViewProps) {
   const src = node.attrs.src as string
   const uploading = node.attrs['data-uploading'] as string | null
   const uploadProgress = node.attrs['data-upload-progress'] as number | null
