@@ -14,10 +14,12 @@ import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import TextAlign from "@tiptap/extension-text-align";
-
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
-import "./Editor.css";
+
+import { isMacOS } from "../utils/platform";
+
+// ... rest of imports
 import { FilesSidebar } from "./FilesSidebar";
 import { FilesModal } from "./FilesModal";
 import { ActiveUsersAvatars } from "../components/ActiveUsersAvatars";
@@ -833,7 +835,7 @@ export const Editor: React.FC<EditorProps> = ({
   // Keyboard shortcuts listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = navigator.platform.toUpperCase().includes("MAC");
+      const isMac = isMacOS();
       const modKey = isMac ? e.metaKey : e.ctrlKey;
 
       // Ctrl/Cmd + S - Save
