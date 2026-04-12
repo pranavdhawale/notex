@@ -11,6 +11,7 @@ interface KeyboardShortcutsPopupProps {
 
 const isMac = isMacOS();
 const modKey = isMac ? "Cmd" : "Ctrl";
+const altKey = isMac ? "Opt" : "Alt";
 
 const shortcutGroups = [
   {
@@ -20,15 +21,19 @@ const shortcutGroups = [
       { action: "Italic", key: `${modKey}+I` },
       { action: "Strikethrough", key: `${modKey}+Shift+X` },
       { action: "Underline", key: `${modKey}+U` },
-      { action: "Highlight", key: "—", noShortcut: true },
+      { action: "Highlight", key: `${modKey}+Shift+H` },
+      { action: "Subscript", key: `${modKey}+,` },
+      { action: "Superscript", key: `${modKey}+.` },
+      { action: "Text Color", key: "—", noShortcut: true },
     ],
   },
   {
     title: "Headings",
     shortcuts: [
-      { action: "Heading 1", key: `${modKey}+Alt+1` },
-      { action: "Heading 2", key: `${modKey}+Alt+2` },
-      { action: "Heading 3", key: `${modKey}+Alt+3` },
+      { action: "Heading 1", key: `${modKey}+${altKey}+1` },
+      { action: "Heading 2", key: `${modKey}+${altKey}+2` },
+      { action: "Heading 3", key: `${modKey}+${altKey}+3` },
+      { action: "Paragraph", key: `${modKey}+${altKey}+0` },
     ],
   },
   {
@@ -43,26 +48,25 @@ const shortcutGroups = [
     title: "Blocks",
     shortcuts: [
       { action: "Blockquote", key: `${modKey}+Shift+B` },
-      { action: "Code Block", key: `${modKey}+Alt+C` },
-      { action: "Horizontal Rule", key: "—", noShortcut: true },
+      { action: "Code Block", key: `${modKey}+${altKey}+C` },
+      { action: "Horizontal Rule", key: `${modKey}+${altKey}+-` },
     ],
   },
   {
-    title: "Alignment",
+    title: "Indentation",
     shortcuts: [
-      { action: "Align Left", key: "—", noShortcut: true },
-      { action: "Align Center", key: "—", noShortcut: true },
-      { action: "Align Right", key: "—", noShortcut: true },
-      { action: "Justify", key: "—", noShortcut: true },
+      { action: "Indent", key: "Tab" },
+      { action: "Outdent", key: "Shift+Tab" },
     ],
   },
   {
     title: "Other",
     shortcuts: [
-      { action: "Save", key: `${modKey}+S` },
-      { action: "Lock/Unlock Room", key: `${modKey}+L` },
-      { action: "Link", key: "—", noShortcut: true },
+      { action: "Link", key: `${modKey}+K` },
       { action: "Insert Table", key: "—", noShortcut: true },
+      { action: "Hard Break", key: "Shift+Enter" },
+      { action: "Save Snapshot", key: `${modKey}+S` },
+      { action: "Lock/Unlock Room", key: `${modKey}+L` },
       { action: "Shortcuts", key: `${modKey}+/` },
     ],
   },
