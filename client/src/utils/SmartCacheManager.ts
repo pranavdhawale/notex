@@ -14,16 +14,11 @@ let quotaWarningShown = false;
 
 /**
  * Show a warning notification about storage quota
- * Uses console.warn for now - can be integrated with toast system
+ * Can be integrated with toast system for better UX
  */
 function notifyQuotaWarning(): void {
   if (quotaWarningShown) return;
   quotaWarningShown = true;
-
-  console.warn(
-    "⚠️ Storage quota nearly exceeded. Your document may not sync properly if storage is full. " +
-    "Consider closing other browser tabs to free memory."
-  );
 
   // Reset warning flag after 5 minutes to allow showing again
   setTimeout(() => {
@@ -114,7 +109,6 @@ export class SmartCacheManager {
   remove(roomSlug: string): void {
     sessionStorage.removeItem(`${this.prefix}${roomSlug}`);
     sessionStorage.removeItem(`${this.yjsPrefix}${roomSlug}`);
-    console.log(`🗑️ Removed room from cache: ${roomSlug}`);
   }
 
   // ========================================
@@ -183,7 +177,6 @@ export class SmartCacheManager {
         sessionStorage.removeItem(key);
       }
     });
-    console.log("🗑️ Cleared all room caches");
   }
 
   /**
@@ -228,7 +221,6 @@ export class SmartCacheManager {
     const rooms = this.getAllRooms();
     // Remove oldest 25% of caches
     const toRemove = Math.ceil(rooms.length * 0.25);
-    console.warn(`🗑️ Clearing ${toRemove} oldest cache entries to free space`);
 
     for (let i = 0; i < toRemove && i < rooms.length; i++) {
       this.remove(rooms[i].slug);
