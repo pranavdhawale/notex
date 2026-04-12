@@ -132,10 +132,10 @@ func UploadFile(c *gin.Context) {
 
 	// Save to Mongo
 	collection := state.MongoDatabase.Collection("files")
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel2()
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer dbCancel()
 
-	_, err = collection.InsertOne(ctx2, fileRecord)
+	_, err = collection.InsertOne(dbCtx, fileRecord)
 	if err != nil {
 		// Try to cleanup MinIO on database failure
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -262,10 +262,10 @@ func DownloadFile(c *gin.Context) {
 	}
 
 	// Stream from MinIO
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel2()
+	downloadCtx, downloadCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer downloadCancel()
 
-	reader, err := state.MinIOClient.Download(ctx2, reconstructedKey)
+	reader, err := state.MinIOClient.Download(downloadCtx, reconstructedKey)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "File content missing"})
 		return
@@ -337,9 +337,9 @@ func DeleteFile(c *gin.Context) {
 	reconstructedKey := fmt.Sprintf("%s/%s%s", roomID, file.ID, ext)
 
 	// Delete from MinIO (best effort)
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel2()
-	if err := state.MinIOClient.Delete(ctx2, reconstructedKey); err != nil {
+	deleteCtx, deleteCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer deleteCancel()
+	if err := state.MinIOClient.Delete(deleteCtx, reconstructedKey); err != nil {
 		log.Printf("Warning: failed to delete from MinIO: %v", err)
 	}
 
@@ -427,10 +427,10 @@ func DeleteAllFiles(c *gin.Context) {
 	}
 
 	// Delete from MinIO using batch operation (much more efficient than sequential deletes)
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel2()
+	batchCtx, batchCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer batchCancel()
 
-	if err := state.MinIOClient.DeleteBatch(ctx2, storageKeys); err != nil {
+	if err := state.MinIOClient.DeleteBatch(batchCtx, storageKeys); err != nil {
 		log.Printf("Warning: some MinIO deletions may have failed: %v", err)
 	}
 
