@@ -82,7 +82,9 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
   const fetchFiles = useCallback(async () => {
     try {
       const res = await api.get(`/api/rooms/${roomSlug}/files`);
-      setFiles(Array.isArray(res.data) ? res.data : []);
+      // API returns { files: [...], pagination: {...} }
+      const filesData = res.data.files || res.data;
+      setFiles(Array.isArray(filesData) ? filesData : []);
     } catch (e) {
       console.error(e);
       setFiles([]);
