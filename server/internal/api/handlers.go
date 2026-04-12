@@ -266,12 +266,22 @@ func deleteRoomTransaction(ctx context.Context, slug string) error {
 			_, err = fileCollection.DeleteMany(sessCtx, bson.M{"room_id": slug})
 			return nil, err
 		})
-		return err
+		// If transaction succeeded, return
+		if err == nil {
+			return nil
+		}
+		// If transaction failed due to replica set requirement, fall through to non-transactional deletion
+		if strings.Contains(err.Error(), "Transaction numbers are only allowed on a replica set") {
+			log.Printf("MongoDB transactions not available (standalone instance), using non-transactional deletion")
+		} else {
+			// Other transaction errors should be returned
+			return err
+		}
+	} else {
+		log.Printf("Warning: MongoDB sessions not available, using non-transactional deletion: %v", err)
 	}
 
 	// Fallback: non-transactional deletion (for standalone MongoDB or older versions)
-	log.Printf("Warning: MongoDB transactions not available, using non-transactional deletion: %v", err)
-
 	collection := state.MongoDatabase.Collection("rooms")
 	_, err = collection.DeleteOne(ctx, bson.M{"slug": slug})
 	if err != nil {
