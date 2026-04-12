@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Editor } from '@tiptap/react';
-import { 
+import {
   BetweenHorizontalEnd,
   BetweenHorizontalStart,
   BetweenVerticalEnd,
@@ -14,10 +15,11 @@ interface TableContextMenuProps {
   isOpen: boolean;
   x: number;
   y: number;
+  editorBounds: DOMRect | null;
   onClose: () => void;
 }
 
-export const TableContextMenu: React.FC<TableContextMenuProps> = ({ editor, isOpen, x, y, onClose }) => {
+export const TableContextMenu: React.FC<TableContextMenuProps> = ({ editor, isOpen, x, y, editorBounds, onClose }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,14 +54,44 @@ export const TableContextMenu: React.FC<TableContextMenuProps> = ({ editor, isOp
     onClose();
   };
 
-  // Ensure menu doesn't go off screen (approximate dimensions)
-  const menuWidth = 320; 
+  // Menu dimensions
+  const menuWidth = 320;
   const menuHeight = 50;
-  
-  const safeX = Math.min(x, window.innerWidth - menuWidth - 20);
-  const safeY = Math.min(y, window.innerHeight - menuHeight - 20);
+  const padding = 10;
 
-  return (
+  let safeX = x;
+  let safeY = y;
+
+  if (editorBounds) {
+    // Calculate position relative to editor bounds
+    // x and y are viewport coordinates, editorBounds is also viewport-relative
+    const editorLeft = editorBounds.left;
+    const editorRight = editorBounds.right;
+    const editorTop = editorBounds.top;
+    const editorBottom = editorBounds.bottom;
+
+    // Ensure menu stays within editor horizontal bounds
+    if (x + menuWidth + padding > editorRight) {
+      // Position menu to the left of cursor if it would overflow right
+      safeX = Math.max(editorLeft + padding, x - menuWidth);
+    } else {
+      safeX = Math.max(editorLeft + padding, x);
+    }
+
+    // Ensure menu stays within editor vertical bounds
+    if (y + menuHeight + padding > editorBottom) {
+      // Position menu above cursor if it would overflow bottom
+      safeY = Math.max(editorTop + padding, y - menuHeight);
+    } else {
+      safeY = Math.max(editorTop + padding, y);
+    }
+  } else {
+    // Fallback to window bounds if editor bounds not available
+    safeX = Math.min(x, window.innerWidth - menuWidth - padding);
+    safeY = Math.min(y, window.innerHeight - menuHeight - padding);
+  }
+
+  return createPortal(
     <div
       ref={menuRef}
       className="editor-toolbar-simple table-context-menu"
@@ -101,7 +133,7 @@ export const TableContextMenu: React.FC<TableContextMenuProps> = ({ editor, isOp
       >
         <Trash2 size={14} />
       </button>
-      
+
       <div style={{ width: "1px", height: "16px", background: "rgba(255,255,255,0.2)", margin: "0 2px" }}></div>
 
       <button
@@ -137,6 +169,7 @@ export const TableContextMenu: React.FC<TableContextMenuProps> = ({ editor, isOp
       >
         <XSquare size={16} />
       </button>
-    </div>
+    </div>,
+    document.body
   );
 };

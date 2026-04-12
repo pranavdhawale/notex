@@ -2,18 +2,20 @@ import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle, us
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Collaboration from "@tiptap/extension-collaboration";
-import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
+import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
 // Extensions
 import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
+import Subscript from "@tiptap/extension-subscript";
+import Superscript from "@tiptap/extension-superscript";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
-import Table from "@tiptap/extension-table";
-import TableRow from "@tiptap/extension-table-row";
-import TableCell from "@tiptap/extension-table-cell";
-import TableHeader from "@tiptap/extension-table-header";
+import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
 import TextAlign from "@tiptap/extension-text-align";
+import { TextStyle } from "@tiptap/extension-text-style";
+import { Color } from "@tiptap/extension-color";
+import { Indent } from "./extensions/Indent";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 
@@ -79,6 +81,7 @@ const TiptapEditor = forwardRef<EditorRef, {
   onUnlockRoom,
 }, ref) => {
   const [menuState, setMenuState] = useState({ isOpen: false, x: 0, y: 0 });
+  const [editorBounds, setEditorBounds] = useState<DOMRect | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -87,17 +90,61 @@ const TiptapEditor = forwardRef<EditorRef, {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        history: false,
+        undoRedo: false,  // Renamed from 'history' in v3
+        link: false,      // Disable default, using custom config below
+        underline: false, // Disable default, using separate import below
       }),
       Collaboration.configure({
         document: provider.doc,
       }),
-      CollaborationCursor.configure({
+      CollaborationCaret.configure({
         provider: provider,
         user: userDetails,
       }),
       Underline,
       Highlight,
+      Subscript.configure({
+        HTMLAttributes: {
+          class: "subscript",
+        },
+      }).extend({
+        addKeyboardShortcuts() {
+          return {
+            "Mod-,": () => {
+              // If subscript is already active, just toggle it off
+              if (this.editor.isActive("subscript")) {
+                return this.editor.commands.unsetSubscript();
+              }
+              // Otherwise, remove superscript first, then apply subscript
+              return this.editor.chain()
+                .unsetSuperscript()
+                .setSubscript()
+                .run();
+            },
+          };
+        },
+      }),
+      Superscript.configure({
+        HTMLAttributes: {
+          class: "superscript",
+        },
+      }).extend({
+        addKeyboardShortcuts() {
+          return {
+            "Mod-.": () => {
+              // If superscript is already active, just toggle it off
+              if (this.editor.isActive("superscript")) {
+                return this.editor.commands.unsetSuperscript();
+              }
+              // Otherwise, remove subscript first, then apply superscript
+              return this.editor.chain()
+                .unsetSubscript()
+                .setSuperscript()
+                .run();
+            },
+          };
+        },
+      }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Link.configure({ openOnClick: false }),
@@ -106,7 +153,20 @@ const TiptapEditor = forwardRef<EditorRef, {
       TableHeader,
       TableCell,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
+      TextStyle,
+      Color,
+      Indent.configure({
+        types: ["listItem", "paragraph", "heading"],
+        minLevel: 0,
+        maxLevel: 8,
+        indentRange: 24,
+      }),
     ],
+
+    // v3 Performance Options:
+    shouldRerenderOnTransaction: false,  // Prevents re-renders on cursor movements
+    immediatelyRender: true,              // Render immediately (good for UX)
+
     editorProps: {
       attributes: {
         class: "ProseMirror",
@@ -180,20 +240,22 @@ const TiptapEditor = forwardRef<EditorRef, {
 
     const target = e.target as HTMLElement;
     // Check if the right-click occurred inside a table
-    const isInsideTable = target.closest('table') !== null || target.closest('td') !== null || target.closest('th') !== null || editor.isActive('table');
+    const tableCell = target.closest('td') || target.closest('th');
+    const isInsideTable = tableCell !== null;
 
     if (isInsideTable) {
       e.preventDefault();
-      // Set the cursor position to the clicked element if possible, 
-      // though Tiptap usually handles this automatically on mousedown.
-      
+      e.stopPropagation();
+      // Get the editor container bounds for positioning
+      const bounds = scrollRef.current?.getBoundingClientRect() || null;
+      setEditorBounds(bounds);
       setMenuState({
         isOpen: true,
         x: e.clientX,
         y: e.clientY,
       });
     } else {
-      // If clicking outside a table, just let native menu show or close our menu
+      // If clicking outside a table, close our menu
       if (menuState.isOpen) {
         setMenuState(prev => ({ ...prev, isOpen: false }));
       }
@@ -406,6 +468,7 @@ const TiptapEditor = forwardRef<EditorRef, {
           isOpen={menuState.isOpen}
           x={menuState.x}
           y={menuState.y}
+          editorBounds={editorBounds}
           onClose={() => setMenuState(prev => ({ ...prev, isOpen: false }))}
         />
         <div onContextMenu={handleContextMenu} style={{ minHeight: '100%' }}>
@@ -684,7 +747,6 @@ export const Editor: React.FC<EditorProps> = ({
               bytes[i] = binaryString.charCodeAt(i);
             }
             Y.applyUpdate(ydoc, bytes);
-            console.log("📥 Server snapshot merged");
           } catch (err) {
             console.error("Failed to merge server snapshot", err);
           }
@@ -738,7 +800,6 @@ export const Editor: React.FC<EditorProps> = ({
       if (cachedUpdate) {
         try {
           Y.applyUpdate(doc, cachedUpdate);
-          console.log("✅ Restored Yjs state from SessionStorage");
         } catch (e) {
           console.error("Failed to apply cached Yjs state:", e);
         }

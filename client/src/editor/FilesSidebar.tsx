@@ -257,7 +257,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       setFiles((prev) => [...(Array.isArray(prev) ? prev : []), newFile]);
     } catch (err: any) {
       if (axios.isCancel(err)) {
-        console.log("Upload cancelled");
+        // Upload cancelled by user - silently ignore
       } else if (err.response?.data?.error) {
         // Rate limit error - show server message
         toast.error(err.response.data.error);
