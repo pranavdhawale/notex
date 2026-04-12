@@ -2,16 +2,25 @@ package middleware
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+// Metrics tracks rate limiter statistics
+type Metrics struct {
+	Allowed   int64
+	Rejected  int64
+	Total     int64
+}
 
 // RateLimiter provides in-memory rate limiting using a sliding window
 type RateLimiter struct {
 	requests    sync.Map // map[string]*requestCount
 	maxRequests int
 	windowSize  time.Duration
+	metrics     Metrics
 }
 
 type requestCount struct {
@@ -48,13 +57,27 @@ func (r *RateLimiter) Allow(key string) bool {
 		counter.windowStart = now
 	}
 
+	// Track metrics
+	atomic.AddInt64(&r.metrics.Total, 1)
+
 	// Check if within limit
 	if counter.count >= r.maxRequests {
+		atomic.AddInt64(&r.metrics.Rejected, 1)
 		return false
 	}
 
 	counter.count++
+	atomic.AddInt64(&r.metrics.Allowed, 1)
 	return true
+}
+
+// GetMetrics returns current metrics for this rate limiter
+func (r *RateLimiter) GetMetrics() Metrics {
+	return Metrics{
+		Allowed:  atomic.LoadInt64(&r.metrics.Allowed),
+		Rejected: atomic.LoadInt64(&r.metrics.Rejected),
+		Total:    atomic.LoadInt64(&r.metrics.Total),
+	}
 }
 
 // Cleanup removes old entries periodically
@@ -187,6 +210,26 @@ func RateLimitDownload() gin.HandlerFunc {
 // Shutdown stops the cleanup goroutine
 func Shutdown() {
 	close(shutdownCh)
+}
+
+// AllMetrics returns metrics for all rate limiters
+type AllMetrics struct {
+	Upload   Metrics
+	Download Metrics
+	Room     Metrics
+	Save     Metrics
+	Password Metrics
+}
+
+// GetAllMetrics returns metrics for all rate limiters
+func GetAllMetrics() AllMetrics {
+	return AllMetrics{
+		Upload:   UploadLimiter.GetMetrics(),
+		Download: DownloadLimiter.GetMetrics(),
+		Room:     RoomLimiter.GetMetrics(),
+		Save:     SaveLimiter.GetMetrics(),
+		Password: PasswordLimiter.GetMetrics(),
+	}
 }
 
 // init starts cleanup goroutine with proper shutdown handling
