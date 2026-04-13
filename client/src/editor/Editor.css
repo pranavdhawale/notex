@@ -127,7 +127,7 @@
 
 /* Left side of status bar - prevent overflow */
 .status-bar-row > div:first-child {
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* Room name text truncation */
