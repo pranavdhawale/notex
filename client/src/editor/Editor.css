@@ -558,21 +558,30 @@
   background: transparent;
 }
 
-/* --- Collaboration Caret Fix --- */
-.collaboration-caret__caret {
+/* ========================================
+   COLLABORATION CURSOR STYLES
+   Tiptap v3 @tiptap/extension-collaboration-caret
+   ======================================== */
+
+/* The cursor widget (the blinking line + name label) */
+.collaboration-carets__caret {
   position: relative;
   margin-left: -1px;
   margin-right: -1px;
-  border-left: 2px solid #fff;
-  border-right: 2px solid #fff;
+  border-left: 2px solid currentColor;
+  border-right: none;
   word-break: normal;
   pointer-events: none;
+  display: inline-block;
+  height: 1.2em;
+  vertical-align: middle;
 }
 
-.collaboration-caret__label {
+/* The user name label above the cursor */
+.collaboration-carets__label {
   position: absolute;
-  top: -1.4em;
-  left: -1px;
+  top: -1.5em;
+  left: -2px;
   font-size: 10px;
   font-style: normal;
   font-weight: 600;
@@ -582,8 +591,88 @@
   padding: 0.1rem 0.3rem;
   border-radius: 3px 3px 3px 0;
   white-space: nowrap;
-  opacity: 0.8;
-  z-index: 10;
+  z-index: 100;
+  opacity: 1;
+}
+
+/* Legacy class support for backwards compatibility */
+.collaboration-caret__caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 2px solid currentColor;
+  word-break: normal;
+  pointer-events: none;
+  display: inline-block;
+  height: 1.2em;
+  vertical-align: middle;
+}
+
+.collaboration-caret__label {
+  position: absolute;
+  top: -1.5em;
+  left: -2px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: normal;
+  user-select: none;
+  color: #000;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px 3px 3px 0;
+  white-space: nowrap;
+  z-index: 100;
+  opacity: 1;
+}
+
+/* ========================================
+   COLLABORATION SELECTION STYLES
+   Prevents full-line highlighting issue
+   ======================================== */
+
+/* The selection highlight (when user selects text) */
+.ProseMirror-yjs-selection {
+  /* Semi-transparent background using the user's color */
+  background-color: inherit;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Cursor container - ensures proper positioning */
+.ProseMirror-yjs-cursor {
+  position: relative;
+  display: inline;
+  pointer-events: none;
+}
+
+/* Selection highlight custom properties per user */
+.ProseMirror-yjs-selection[data-user] {
+  /* Allow the inline style background-color to show through */
+  mix-blend-mode: multiply;
+}
+
+/* Ensure cursor is always visible above selection */
+.collaboration-carets__caret,
+.collaboration-caret__caret {
+  z-index: 50;
+}
+
+/* Animation for cursor blink (optional, Google Docs style) */
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.3; }
+}
+
+/* Apply subtle blink to carets when not moving */
+.collaboration-carets__caret::after,
+.collaboration-caret__caret::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  animation: cursor-blink 1s ease-in-out infinite;
 }
 
 .file-item-glass {

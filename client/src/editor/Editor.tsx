@@ -190,6 +190,14 @@ const TiptapEditor = forwardRef<EditorRef, {
       CollaborationCaret.configure({
         provider: provider,
         user: userDetails,
+        // Custom selection render to prevent full-line highlighting
+        selectionRender: (user) => {
+          return {
+            class: 'ProseMirror-yjs-selection',
+            style: `background-color: ${user.color}40;`, // 40 hex = 25% opacity (subtle)
+            'data-user': user.name,
+          };
+        },
       }),
       Underline,
       Highlight,
