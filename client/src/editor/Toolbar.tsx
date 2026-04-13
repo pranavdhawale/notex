@@ -89,6 +89,7 @@ const dropdownItemStyle: React.CSSProperties = {
   cursor: "pointer",
   fontSize: "13px",
   textAlign: "left",
+  whiteSpace: "nowrap",
   transition: "background 0.15s ease",
 };
 
@@ -285,7 +286,7 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
             <div style={dropdownStyle}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "4px", padding: "4px" }}>
                 {TEXT_COLORS.map((c) => (
-                  <button
+                  <div
                     key={c.color}
                     onClick={() => setCurrentColor(c.color)}
                     style={{
@@ -305,7 +306,7 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
                     title={c.name}
                   >
                     {c.color === "inherit" ? "A" : ""}
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -318,7 +319,7 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
             onClick={() => setShowHeadingPicker(!showHeadingPicker)}
             className={`toolbar-btn-circle ${activeHeading ? "is-active" : ""}`}
             title="Headings"
-            style={{ display: "flex", alignItems: "center", gap: "2px" }}
+            style={{ width: "46px", aspectRatio: "auto", borderRadius: "23px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}
           >
             {(() => {
               const Icon = activeHeading?.icon || Pilcrow;
@@ -329,7 +330,7 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
           {showHeadingPicker && (
             <div style={dropdownStyle}>
               {HEADINGS.map((h) => (
-                <button
+                <div
                   key={h.level}
                   onClick={() => setHeading(h.level)}
                   style={dropdownItemStyle}
@@ -338,7 +339,7 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
                 >
                   <h.icon size={16} />
                   {h.label}
-                </button>
+                </div>
               ))}
             </div>
           )}
@@ -402,7 +403,7 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
             onClick={() => setShowAlignmentPicker(!showAlignmentPicker)}
             className="toolbar-btn-circle"
             title="Text Alignment"
-            style={{ display: "flex", alignItems: "center", gap: "2px" }}
+            style={{ width: "46px", aspectRatio: "auto", borderRadius: "23px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}
           >
             {(() => {
               const Icon = activeAlignments[0]?.icon || AlignLeft;
@@ -413,7 +414,7 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
           {showAlignmentPicker && (
             <div style={dropdownStyle}>
               {ALIGNMENTS.map((a) => (
-                <button
+                <div
                   key={a.value}
                   onClick={() => setAlignment(a.value)}
                   style={dropdownItemStyle}
@@ -422,13 +423,11 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
                 >
                   <a.icon size={16} />
                   {a.label}
-                </button>
+                </div>
               ))}
             </div>
           )}
         </div>
-
-        <div style={{ width: "1px", height: "24px", background: "rgba(255,255,255,0.1)", margin: "0 4px" }}></div>
 
         {/* Indent/Outdent */}
         <button
