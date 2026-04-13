@@ -286,7 +286,7 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
             <div style={dropdownStyle}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "4px", padding: "4px" }}>
                 {TEXT_COLORS.map((c) => (
-                  <div
+                  <button
                     key={c.color}
                     onClick={() => setCurrentColor(c.color)}
                     style={{
@@ -306,7 +306,7 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
                     title={c.name}
                   >
                     {c.color === "inherit" ? "A" : ""}
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
