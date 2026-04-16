@@ -15,7 +15,8 @@ export function ImageNodeView({ node }: NodeViewProps) {
   const revokedRef = useRef<string | null>(null)
 
   // Determine if this is a server URL that needs authenticated fetching
-  const isServerUrl = src && src.startsWith('/api/')
+  // Matches both old (/files/:id/image) and new (/images/:id/raw) URL patterns
+  const isServerUrl = src && /^\/api\/rooms\/[^/]+\/(files\/[^/]+\/image|images\/[^/]+\/raw)$/.test(src)
 
   // Fetch image via authenticated request and create blob URL
   const fetchImage = useCallback(async () => {
