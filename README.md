@@ -14,6 +14,7 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 - **Human-Friendly URLs 🎯**: Share memorable room links like `notex.pranavdhawale.in/my-project` or `notex.pranavdhawale.in/cosmic-whale`.
 - **Real-Time Magic ✨**: See cursors fly and text appear instantly with CRDT-backed concurrency.
 - **Ephemeral & Private 🔐**: Rooms auto-expire (24h empty, 7d with content) but you can save snapshots when needed.
+- **Room Locking 🔒**: Password-protect rooms for restricted access with single-use auth tokens.
 - **Mobile-First �**: Designed for seamless use on phones with a dedicated mobile UI and files modal.
 - **Engineering Excellence 🛠️**: A simple UI powers a robust, high-performance engine utilizing Go and modern web technologies.
 
@@ -61,6 +62,8 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 - **Download Files**: Access uploaded files anytime
 - **Inline Images**: Paste or drag images into the editor — they upload automatically and embed inline for all collaborators
 - **File Management**: View all files in a room
+- **Image Gallery**: Browse, insert, delete, and manage images with a dedicated gallery popup (Ctrl+Shift+/)
+- **File-Image Interop**: Insert files as inline images, or save inline images back to the files collection
 
 ### ⚡ Performance & Caching
 
@@ -81,7 +84,7 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 - **Blocks**: Blockquote (Ctrl+Shift+B), Code block (Ctrl+Alt+C), Horizontal rule (Ctrl+Alt+-)
 - **Indentation**: Indent (Tab), Outdent (Shift+Tab)
 - **Other**: Link (Ctrl+K), Hard break (Shift+Enter)
-- **Navigation**: Save snapshot (Ctrl+S), Lock/Unlock (Ctrl+L), Shortcuts help (Ctrl+/)
+- **Navigation**: Save snapshot (Ctrl+S), Lock/Unlock (Ctrl+L), Shortcuts help (Ctrl+/), Image gallery (Ctrl+Shift+/)
 
 ### 🖱️ Table Editing
 
@@ -101,23 +104,27 @@ Notex isn't just a toy; it's an architectural showcase.
 - **Tiptap v3**: Headless wrapper for ProseMirror, full editor control with reactive state
 - **Tiptap Image + FileHandler**: Inline image drag-drop-paste with authenticated rendering
 - **Yjs**: CRDT library for conflict-free real-time collaboration
+- **Framer Motion**: Animation library for startup animation
 - **OGL**: Ultra-lightweight WebGL library for the particle system
 - **Lucide React**: Beautiful icon library
+- **Sonner**: Toast notifications
 
 ### **Backend** (The Beast) 🦍
 
 - **Go (Golang) 1.25+**: Raw performance and first-class concurrency
 - **Gin**: High-performance HTTP web framework
-- **WebSocket**: Native Go WebSocket for real-time communication
-- **MongoDB**: Stores room metadata, content, and application state
-- **MinIO**: S3-compatible object storage for secure, scalable file handling
+- **Gorilla WebSocket**: Real-time communication with ping/pong keepalive
+- **MongoDB**: Stores rooms, content, files, and images with TTL auto-expiry
+- **MinIO**: S3-compatible object storage for files and images with thumbnail generation
 - **golang-petname**: Human-friendly slug generation
+- **Argon2id**: Password hashing for room locking
 
 ### **Infrastructure** 🏗️
 
 - **Docker & Docker Compose**: Containerized development and deployment
 - **Air**: Live reload for Go development
-- **Nginx**: Production reverse proxy
+- **Nginx**: Production reverse proxy (API, WebSocket, and uploads proxying)
+- **pako**: Client-side compression for session cache persistence
 
 ## ⚡ Quick Start
 
@@ -158,14 +165,15 @@ graph TD
 
 ### Key Components
 
-- **Client**: React SPA with Tiptap editor and Yjs integration
+- **Client**: React SPA with Tiptap v3 editor and Yjs CRDT integration
 - **Server**: Go API server with WebSocket hub, secured by centralized rate limiters and auth middleware
-- **MongoDB**: Persistent storage for rooms, content, and metadata
-- **MinIO**: S3-compatible service for robust, scalable object & file storage
-- **WebSocket Hub**: Manages active connections and broadcasts updates
-- **Smart Cache**: Browser-based caching for resilience
-- **Token Store**: In-memory auth token management for locked room access
-- **Cleanup Service**: Routine cleanup of orphaned files and expired auth tokens
+- **MongoDB**: Persistent storage for rooms, content, files, and images (with TTL indexes for auto-expiry)
+- **MinIO**: S3-compatible service for file and image object storage with thumbnail generation
+- **WebSocket Hub**: Manages active connections, broadcasts Yjs updates, and caches awareness state
+- **Smart Cache**: Browser-based session caching with pako compression for resilience
+- **Token Store**: In-memory auth token management for locked room access (1-hour expiry)
+- **Room Cache**: In-memory room metadata cache to reduce DB lookups on WebSocket connections
+- **Cleanup Service**: Background jobs that clean orphaned files, unreferenced images, and expired tokens
 
 ## 📁 Project Structure
 
@@ -182,10 +190,12 @@ notex/
 │   │   │   └── extensions/  # Custom Tiptap extensions
 │   │   │       ├── Image.ts
 │   │   │       ├── ImageNodeView.tsx
-│   │   │       └── Indent.ts
+│   │   │       ├── Indent.ts
+│   │   │       └── SlashCommand.ts
 │   │   ├── components/    # Shared components
 │   │   │   ├── ActiveUsersAvatars.tsx
 │   │   │   ├── ConfirmationModal.tsx
+│   │   │   ├── ImageGalleryPopup.tsx
 │   │   │   ├── KeyboardShortcutsPopup.tsx
 │   │   │   ├── LockUnlockModal.tsx
 │   │   │   ├── NotFoundView.tsx
@@ -208,24 +218,27 @@ notex/
 ├── server/                # Go backend
 │   ├── main.go
 │   ├── internal/
-│   │   ├── api/          # Protected HTTP handlers
-│   │   │   ├── handlers.go
-│   │   │   ├── upload.go
-│   │   │   ├── image.go
-│   │   │   └── roomlock.go
-│   │   ├── cleanup/      # Orphaned file cleanup
-│   │   ├── middleware/   # Security layer (Auth & Rate limits)
-│   │   ├── models/       # Data models
-│   │   ├── state/       # DB & State connections
-│   │   │   ├── mongo.go
-│   │   │   ├── storage.go
-│   │   │   └── authtoken.go
-│   │   ├── storage/      # MinIO client and file handling
-│   │   ├── utils/        # Utilities
-│   │   └── ws/           # WebSocket hub & clients
+│   │   ├── api/          # HTTP handlers
+│   │   │   ├── handlers.go     # Room CRUD, save
+│   │   │   ├── upload.go       # File upload/download/delete
+│   │   │   ├── image.go        # Inline image serving
+│   │   │   ├── images.go       # Image CRUD, thumbnails, reconcile, cleanup
+│   │   │   └── roomlock.go    # Lock/unlock, password auth
+│   │   ├── cleanup/      # Background orphan cleanup jobs
+│   │   ├── middleware/    # Auth & rate limiting
+│   │   ├── models/       # Data models (room, file, image)
+│   │   ├── state/       # DB connections & in-memory state
+│   │   │   ├── mongo.go        # MongoDB init, indexes, TTL
+│   │   │   ├── storage.go      # MinIO init
+│   │   │   ├── authtoken.go    # In-memory token store for locked rooms
+│   │   │   └── roomcache.go    # In-memory room metadata cache
+│   │   ├── storage/      # MinIO client wrapper
+│   │   ├── utils/        # Slug generation, password hashing
+│   │   └── ws/           # WebSocket hub, client, handler
 │   └── Dockerfile
 │
-└── docker-compose.dev.yml
+├── docker-compose.dev.yml
+└── docker-compose.prod.yml
 ```
 
 ## 👩‍💻 Development
