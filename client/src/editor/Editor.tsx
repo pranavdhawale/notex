@@ -1132,15 +1132,16 @@ export const Editor: React.FC<EditorProps> = ({
         return;
       }
 
-      // Ctrl/Cmd + / - Toggle shortcuts popup
-      if (modKey && e.key === "/") {
+      // Mod + / (NO shift) - Toggle shortcuts popup
+      if (modKey && !e.shiftKey && e.key === "/") {
         e.preventDefault();
         setShowShortcuts((prev) => !prev);
         return;
       }
 
-      // Ctrl/Cmd + Shift + I - Toggle image gallery
-      if (modKey && e.shiftKey && e.key.toLowerCase() === "i") {
+      // Mod + Shift + / - Toggle image gallery
+      // Check for both "?" and "/" because some browsers report e.key="/" even with Shift held
+      if (modKey && e.shiftKey && (e.key === "?" || e.key === "/")) {
         e.preventDefault();
         setShowImageGallery((prev) => !prev);
         return;

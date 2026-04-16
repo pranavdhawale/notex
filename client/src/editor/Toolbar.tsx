@@ -473,7 +473,7 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor, onOpenImageGallery }
         <button
           onClick={onOpenImageGallery}
           className="toolbar-btn-circle"
-          title="Insert Image (Ctrl+Shift+I)"
+          title="Insert Image (Mod+Shift+/)"
         >
           <ImageIcon size={16} />
         </button>

@@ -64,6 +64,7 @@ const shortcutGroups = [
     shortcuts: [
       { action: "Link", key: `${modKey}+K` },
       { action: "Insert Table", key: "—", noShortcut: true },
+      { action: "Insert Image", key: `${modKey}+Shift+/` },
       { action: "Hard Break", key: "Shift+Enter" },
       { action: "Save Snapshot", key: `${modKey}+S` },
       { action: "Lock/Unlock Room", key: `${modKey}+L` },
