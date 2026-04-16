@@ -28,6 +28,7 @@ import {
   IndentDecrease,
   ChevronDown,
   Pilcrow,
+  Image as ImageIcon,
 } from "lucide-react";
 
 // Color palette for text color
@@ -95,9 +96,10 @@ const dropdownItemStyle: React.CSSProperties = {
 
 interface ToolbarProps {
   editor: Editor | null;
+  onOpenImageGallery?: () => void;
 }
 
-const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
+const ToolbarComponent: React.FC<ToolbarProps> = ({ editor, onOpenImageGallery }) => {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showHeadingPicker, setShowHeadingPicker] = useState(false);
   const [showAlignmentPicker, setShowAlignmentPicker] = useState(false);
@@ -467,6 +469,13 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor }) => {
           title="Insert Table"
         >
           <TableIcon size={16} />
+        </button>
+        <button
+          onClick={onOpenImageGallery}
+          className="toolbar-btn-circle"
+          title="Insert Image (Mod+Shift+/)"
+        >
+          <ImageIcon size={16} />
         </button>
       </div>
     </div>

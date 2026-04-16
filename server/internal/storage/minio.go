@@ -140,6 +140,21 @@ func (m *MinIOClient) DeleteBatch(ctx context.Context, objectNames []string) err
 	return nil
 }
 
+// Copy duplicates an object within the same bucket from srcKey to dstKey.
+// Uses MinIO's server-side copy — no data is downloaded/uploaded through the client.
+func (m *MinIOClient) Copy(ctx context.Context, srcKey, dstKey string, size int64, contentType string) error {
+	src := minio.CopySrcOptions{Bucket: m.bucket, Object: srcKey}
+	dst := minio.CopyDestOptions{
+		Bucket:      m.bucket,
+		Object:      dstKey,
+		Size:        size,
+		ContentType: contentType,
+	}
+
+	_, err := m.client.CopyObject(ctx, dst, src)
+	return err
+}
+
 // Stat returns object info (used to check if file exists)
 func (m *MinIOClient) Stat(ctx context.Context, objectName string) (minio.ObjectInfo, error) {
 	return m.client.StatObject(ctx, m.bucket, objectName, minio.StatObjectOptions{})

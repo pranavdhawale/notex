@@ -17,6 +17,7 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { Indent } from "./extensions/Indent";
 import { ImageExtension } from "./extensions/Image";
+import { SlashCommand } from "./extensions/SlashCommand";
 import { FileHandler } from "@tiptap/extension-file-handler";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
@@ -37,6 +38,7 @@ import { NotFoundView } from "../components/NotFoundView";
 import { toast } from "../components/Toaster";
 import { KeyboardShortcutsPopup } from "../components/KeyboardShortcutsPopup";
 import { LockRoomModal, UnlockRoomModal } from "../components/LockUnlockModal";
+import { ImageGalleryPopup } from "../components/ImageGalleryPopup";
 import { CURSOR_COLORS, IMAGE_UPLOAD } from "../utils/constants";
 
 interface EditorProps {
@@ -51,6 +53,7 @@ interface EditorProps {
 
 export type EditorRef = {
   focus: () => void;
+  getEditor: () => ReturnType<typeof useEditor>;
 };
 
 const TiptapEditor = forwardRef<EditorRef, {
@@ -68,6 +71,7 @@ const TiptapEditor = forwardRef<EditorRef, {
   onLockRoom: () => void;
   onUnlockRoom: () => void;
   onImageUpload: (file: File) => Promise<string | null>;
+  onOpenImageGallery?: () => void;
 }>(({
   provider,
   userDetails,
@@ -83,6 +87,7 @@ const TiptapEditor = forwardRef<EditorRef, {
   onLockRoom,
   onUnlockRoom,
   onImageUpload,
+  onOpenImageGallery,
 }, ref) => {
   const [menuState, setMenuState] = useState({ isOpen: false, x: 0, y: 0 });
   const [editorBounds, setEditorBounds] = useState<DOMRect | null>(null);
@@ -273,6 +278,9 @@ const TiptapEditor = forwardRef<EditorRef, {
           return false;
         },
       }),
+      SlashCommand.configure({
+        onOpenImageGallery: () => onOpenImageGallery?.(),
+      }),
     ],
 
     // v3 Performance Options:
@@ -290,12 +298,63 @@ const TiptapEditor = forwardRef<EditorRef, {
     },
   });
 
-  // Expose focus method to parent
+  // Expose focus method and editor getter to parent
   useImperativeHandle(ref, () => ({
     focus: () => {
       editor?.commands.focus();
     },
+    getEditor: () => editor,
   }), [editor]);
+
+  // Track image references in Y.Map for GC coordination
+  useEffect(() => {
+    if (!editor) return;
+
+    const ydoc = provider.doc;
+    const imageRefs = ydoc.getMap<boolean>('imageRefs');
+
+    const syncImageRefs = () => {
+      const currentImageIds = new Set<string>();
+
+      editor.state.doc.descendants((node) => {
+        if (node.type.name === 'image') {
+          const src = node.attrs.src as string;
+          if (src && typeof src === 'string') {
+            // Match /images/:id/raw OR /files/:id/image OR /api/rooms/:roomSlug/files/:id/image
+            const match = src.match(/\/(?:images|files)\/([^/]+)\/(?:raw|image)/);
+            if (match) {
+              currentImageIds.add(match[1]);
+            }
+          }
+        }
+      });
+
+      // Sync with Y.Map
+      const existingRefs = new Set(imageRefs.keys());
+
+      currentImageIds.forEach((id) => {
+        if (!existingRefs.has(id)) {
+          imageRefs.set(id, true);
+        }
+      });
+
+      existingRefs.forEach((id) => {
+        if (!currentImageIds.has(id)) {
+          imageRefs.delete(id);
+        }
+      });
+    };
+
+    // Initial sync
+    syncImageRefs();
+
+    // Sync on every editor update
+    editor.on('update', syncImageRefs);
+
+    return () => {
+      editor.off('update', syncImageRefs);
+    };
+  }, [editor, provider.doc]);
 
   // Auto-hide scrollbar + track scroll position
   useEffect(() => {
@@ -557,7 +616,7 @@ const TiptapEditor = forwardRef<EditorRef, {
           </div>
         </div>
 
-        <Toolbar editor={editor} />
+        <Toolbar editor={editor} onOpenImageGallery={onOpenImageGallery} />
       </div>
 
       {/* Scrollable Content Area */}
@@ -627,6 +686,7 @@ export const Editor: React.FC<EditorProps> = ({
   const [notFound, setNotFound] = useState(false);
   const [showFilesModal, setShowFilesModal] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showImageGallery, setShowImageGallery] = useState(false);
   const [files, setFiles] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
@@ -737,23 +797,24 @@ export const Editor: React.FC<EditorProps> = ({
     formData.append("file", file);
 
     try {
-      const res = await api.post(`/api/upload/${roomSlug}`, formData, {
+      const res = await api.post(`/api/rooms/${roomSlug}/images`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         timeout: 10 * 60 * 1000,
       });
 
-      const newFile = res.data;
+      const newImage = res.data;
 
-      // Signal other clients via Yjs metadata
+      // Track image ID in Y.Map for GC coordination
       if (ydoc) {
+        const imageRefs = ydoc.getMap<boolean>('imageRefs');
+        imageRefs.set(newImage.id, true);
+
         const yMeta = ydoc.getMap("meta");
         yMeta.set("lastUpload", Date.now());
       }
 
-      setFiles((prev) => [...prev, newFile]);
-
-      // Return the inline image URL (served with correct Content-Type)
-      return `/api/rooms/${roomSlug}/files/${newFile.id}/image`;
+      // Return the raw image URL
+      return `/api/rooms/${roomSlug}/images/${newImage.id}/raw`;
     } catch (err: any) {
       if (err.response?.data?.error) {
         toast.error(err.response.data.error);
@@ -1009,25 +1070,32 @@ export const Editor: React.FC<EditorProps> = ({
     try {
       const stateVector = Y.encodeStateAsUpdate(ydoc);
       const blob = new Blob([stateVector as unknown as BlobPart]);
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = (reader.result as string).split(",")[1];
-        await api.post(`/api/rooms/${roomSlug}/save`, {
-          content: base64,
-        });
-        if (!silent) toast.success("Saved!");
-      };
-      reader.onerror = () => {
-        console.error("Failed to read blob");
-        if (!silent) toast.error("Failed to save");
-      };
-      reader.readAsDataURL(blob);
+
+      // Wrap FileReader in a promise for proper async/await handling
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = (reader.result as string).split(",")[1];
+          resolve(result);
+        };
+        reader.onerror = () => reject(new Error("Failed to read blob"));
+        reader.readAsDataURL(blob);
+      });
+
+      const imageRefs = ydoc.getMap<boolean>('imageRefs');
+      const activeImageIds = Array.from(imageRefs.keys());
+
+      await Promise.all([
+        api.post(`/api/rooms/${roomSlug}/save`, { content: base64 }),
+        api.post(`/api/rooms/${roomSlug}/images/reconcile`, { imageIds: activeImageIds }),
+      ]);
+
+      if (!silent) toast.success("Saved!");
     } catch (e) {
       console.error(e);
       if (!silent) toast.error("Failed to save");
     } finally {
-      // Keep "Saving..." indicator for a moment so user sees it
-      setTimeout(() => setSaving(false), 500);
+      setSaving(false);
     }
   }, [ydoc, roomSlug]);
 
@@ -1064,10 +1132,18 @@ export const Editor: React.FC<EditorProps> = ({
         return;
       }
 
-      // Ctrl/Cmd + / - Toggle shortcuts popup
-      if (modKey && e.key === "/") {
+      // Mod + / (NO shift) - Toggle shortcuts popup
+      if (modKey && !e.shiftKey && e.key === "/") {
         e.preventDefault();
         setShowShortcuts((prev) => !prev);
+        return;
+      }
+
+      // Mod + Shift + / - Toggle image gallery
+      // Check for both "?" and "/" because some browsers report e.key="/" even with Shift held
+      if (modKey && e.shiftKey && (e.key === "?" || e.key === "/")) {
+        e.preventDefault();
+        setShowImageGallery((prev) => !prev);
         return;
       }
     };
@@ -1092,6 +1168,7 @@ export const Editor: React.FC<EditorProps> = ({
         ydoc={ydoc}
         userId={userId}
         isRoomOwner={isOwner}
+        editor={editorRef.current?.getEditor() ?? null}
         onFocusRestore={() => editorRef.current?.focus()}
       />
 
@@ -1113,6 +1190,7 @@ export const Editor: React.FC<EditorProps> = ({
           onImageUpload={handleImageUpload}
           onLockRoom={() => setShowLockModal(true)}
           onUnlockRoom={() => setShowUnlockModal(true)}
+          onOpenImageGallery={() => setShowImageGallery(true)}
         />
       </div>
 
@@ -1168,6 +1246,20 @@ export const Editor: React.FC<EditorProps> = ({
           onLockChange(false);
           setShowUnlockModal(false);
         }}
+      />
+
+      {/* Image Gallery Popup */}
+      <ImageGalleryPopup
+        isOpen={showImageGallery}
+        onClose={() => {
+          setShowImageGallery(false);
+          editorRef.current?.focus();
+        }}
+        roomSlug={roomSlug}
+        ydoc={ydoc}
+        userId={userId}
+        isRoomOwner={isOwner}
+        editor={editorRef.current?.getEditor() ?? null}
       />
     </div>
   );

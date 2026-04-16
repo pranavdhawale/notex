@@ -55,6 +55,10 @@ func main() {
 	// This handles cases where MongoDB TTL expires rooms but MinIO files remain
 	cleanupStopCh := cleanup.StartOrphanedFilesCleanup(1 * time.Hour)
 
+	// Start image cleanup job (runs every 10 minutes)
+	// Cleans up images where ref_count=0 and last_used_at < 1 hour ago
+	imageCleanupStopCh := cleanup.StartImageCleanupJob(10 * time.Minute)
+
 	// Start room cache cleanup (runs every 10 minutes)
 	// Removes expired room entries from in-memory cache
 	roomCacheStopCh := state.StartRoomCacheCleanup(10 * time.Minute)
@@ -125,6 +129,16 @@ func main() {
 		protected.GET("/rooms/:room/files/:fileId/image", middleware.RateLimitDownload(), api.ServeImage)
 		protected.DELETE("/rooms/:room/files", api.DeleteAllFiles)
 		protected.DELETE("/rooms/:room/files/:fileId", api.DeleteFile)
+		// Image routes
+		protected.POST("/rooms/:room/images", api.UploadImage)
+		protected.GET("/rooms/:room/images", api.ListImages)
+		protected.GET("/rooms/:room/images/:id/raw", api.GetImageRaw)
+		protected.GET("/rooms/:room/images/:id/thumbnail", api.GetImageThumbnail)
+		protected.DELETE("/rooms/:room/images/:id", api.DeleteImage)
+		protected.POST("/rooms/:room/images/reconcile", api.ReconcileImageRefs)
+		protected.POST("/rooms/:room/images/cleanup", api.CleanupUnusedImages)
+		protected.POST("/rooms/:room/images/:id/save-to-files", api.SaveImageToFiles)
+		protected.POST("/rooms/:room/files/:id/insert-to-images", api.InsertFileToImages)
 	}
 
 	// WebSocket Route
@@ -164,6 +178,7 @@ func main() {
 	// Stop background services
 	ws.MainHub.Stop()
 	close(cleanupStopCh)
+	close(imageCleanupStopCh)
 	close(roomCacheStopCh)
 
 	// Stop rate limiter cleanup goroutine

@@ -51,7 +51,7 @@ export const FILE_UPLOAD = {
   /** Maximum file size in bytes (200MB) */
   MAX_SIZE: 200 * 1024 * 1024,
   /** Maximum filename length */
-  MAX_FILENAME_LENGTH: 50,
+  MAX_FILENAME_LENGTH: 255,
 } as const;
 
 /**

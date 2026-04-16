@@ -775,6 +775,7 @@
   height: 32px;
   background: rgba(0, 0, 0, 0.2);
   border: none;
+  border-radius: 50% !important;
   backdrop-filter: blur(4px);
 }
 
@@ -914,7 +915,7 @@
   width: 36px;
   height: 36px;
   padding: 0;
-  border-radius: 50%;
+  border-radius: 50% !important;
   display: flex;
   align-items: center;
   justify-content: center;
