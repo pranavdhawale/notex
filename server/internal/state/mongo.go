@@ -70,6 +70,32 @@ func createIndexes() {
 	} else {
 		log.Println("Index created on files.room_id")
 	}
+
+	// Create TTL Index for Images Collection
+	// Images expire at the same time as their parent room
+	imagesCollection := MongoDatabase.Collection("images")
+	imageTTLIndexModel := mongo.IndexModel{
+		Keys:    bson.M{"expire_at": 1},
+		Options: options.Index().SetExpireAfterSeconds(0),
+	}
+
+	_, err = imagesCollection.Indexes().CreateOne(indexCtx, imageTTLIndexModel)
+	if err != nil {
+		log.Printf("Warning: Failed to create images TTL index: %v", err)
+	} else {
+		log.Println("TTL Index created on images.expire_at")
+	}
+
+	// Create index on images.room_id for fast image lookups
+	imageRoomIDIndexModel := mongo.IndexModel{
+		Keys: bson.M{"room_id": 1},
+	}
+	_, err = imagesCollection.Indexes().CreateOne(indexCtx, imageRoomIDIndexModel)
+	if err != nil {
+		log.Printf("Warning: Failed to create images.room_id index: %v", err)
+	} else {
+		log.Println("Index created on images.room_id")
+	}
 }
 
 func InitMongo(uri string, dbName string) {
@@ -130,6 +156,23 @@ func UpdateFilesTTL(roomID string, expireAt time.Time) error {
 	defer cancel()
 
 	collection := MongoDatabase.Collection("files")
+	_, err := collection.UpdateMany(
+		ctx,
+		bson.M{"room_id": roomID},
+		bson.M{"$set": bson.M{"expire_at": expireAt}},
+	)
+
+	return err
+}
+
+// UpdateImagesTTL updates the expire_at field for all images in a room to match the room's TTL.
+// This ensures images expire at the same time as their parent room.
+// Called when room TTL is refreshed (GetRoom, SaveRoom) to keep image TTL in sync.
+func UpdateImagesTTL(roomID string, expireAt time.Time) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	collection := MongoDatabase.Collection("images")
 	_, err := collection.UpdateMany(
 		ctx,
 		bson.M{"room_id": roomID},

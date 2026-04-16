@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import api from "../utils/api";
 import axios from "axios";
 import * as Y from "yjs";
+import type { Editor } from "@tiptap/react";
 import {
   Trash2,
   Upload,
@@ -11,6 +12,7 @@ import {
   FolderX,
   FileMinus,
   Loader2,
+  FileImage,
 } from "lucide-react";
 import { ConfirmationModal } from "../components/ConfirmationModal";
 import { toast } from "../components/Toaster";
@@ -21,6 +23,7 @@ interface FilesSidebarProps {
   ydoc: Y.Doc;
   userId: string;
   isRoomOwner: boolean;
+  editor: Editor | null;
   onFocusRestore?: () => void;
 }
 
@@ -46,12 +49,19 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
   ydoc,
   userId,
   isRoomOwner,
+  editor,
   onFocusRestore,
 }) => {
   const [files, setFiles] = useState<FileData[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [activeUploads, setActiveUploads] = useState<ActiveUpload[]>([]);
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+
+  // Check if a file is an image based on extension
+  const isImageFile = (filename: string): boolean => {
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+  };
 
   // Download file with authentication
   const handleDownload = async (file: FileData) => {
@@ -114,6 +124,42 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       setFiles((prev) => prev.filter((f) => f.id !== fileId));
     } catch (e) {
       toast.error("Failed to delete file");
+    }
+    onFocusRestore?.();
+  };
+
+  // Insert a file as an image into the document
+  const handleInsertAsImage = async (fileId: string) => {
+    try {
+      const res = await api.post(`/api/rooms/${roomSlug}/files/${fileId}/insert-to-images`);
+      const newImage = res.data;
+
+      // Insert at cursor
+      if (editor) {
+        editor
+          .chain()
+          .focus()
+          .insertContent({
+            type: "image",
+            attrs: {
+              src: newImage.url,
+              alt: newImage.name,
+            },
+          })
+          .run();
+      }
+
+      // Track in Y.Map
+      const imageRefs = ydoc.getMap<boolean>('imageRefs');
+      imageRefs.set(newImage.id, true);
+
+      toast.success('Image inserted');
+    } catch (e: any) {
+      if (e.response?.data?.error) {
+        toast.error(e.response.data.error);
+      } else {
+        toast.error('Failed to insert image');
+      }
     }
     onFocusRestore?.();
   };
@@ -467,6 +513,15 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
                       <Download size={14} />
                     )}
                   </button>
+                  {isImageFile(f.name) && (
+                    <button
+                      onClick={() => handleInsertAsImage(f.id)}
+                      className="btn-icon"
+                      title="Insert in Document"
+                    >
+                      <FileImage size={14} />
+                    </button>
+                  )}
                   {canDelete && (
                     <button
                       onClick={() => handleDeleteFile(f.id)}

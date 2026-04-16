@@ -180,6 +180,11 @@ func GetRoom(c *gin.Context) {
 			if err := state.UpdateFilesTTL(s, t); err != nil {
 				log.Printf("Failed to update file TTL for room %s: %v", s, err)
 			}
+
+			// Also update image TTL to match room TTL
+			if err := state.UpdateImagesTTL(s, t); err != nil {
+				log.Printf("Failed to update image TTL for room %s: %v", s, err)
+			}
 		}(slug, newExpiry)
 	} else {
 		// If at capacity, log and skip TTL update (not critical)
@@ -264,6 +269,13 @@ func deleteRoomTransaction(ctx context.Context, slug string) error {
 			// Delete files
 			fileCollection := state.MongoDatabase.Collection("files")
 			_, err = fileCollection.DeleteMany(sessCtx, bson.M{"room_id": slug})
+			if err != nil {
+				return nil, err
+			}
+
+			// Delete images
+			imageCollection := state.MongoDatabase.Collection("images")
+			_, err = imageCollection.DeleteMany(sessCtx, bson.M{"room_id": slug})
 			return nil, err
 		})
 		// If transaction succeeded, return
@@ -291,6 +303,9 @@ func deleteRoomTransaction(ctx context.Context, slug string) error {
 	fileCollection := state.MongoDatabase.Collection("files")
 	// Error intentionally ignored in fallback - room is already deleted, files will be cleaned up by orphaned files cleanup job
 	_, _ = fileCollection.DeleteMany(ctx, bson.M{"room_id": slug})
+
+	imageCollection := state.MongoDatabase.Collection("images")
+	_, _ = imageCollection.DeleteMany(ctx, bson.M{"room_id": slug})
 	return nil
 }
 
@@ -394,6 +409,12 @@ func SaveRoom(c *gin.Context) {
 	if err := state.UpdateFilesTTL(slug, newExpiry); err != nil {
 		log.Printf("Failed to update file TTL for room %s: %v", slug, err)
 		// Don't fail the request - files can still be cleaned up
+	}
+
+	// Update image TTL to match room TTL
+	if err := state.UpdateImagesTTL(slug, newExpiry); err != nil {
+		log.Printf("Failed to update image TTL for room %s: %v", slug, err)
+		// Don't fail the request - images can still be cleaned up
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Room saved"})
