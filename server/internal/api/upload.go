@@ -20,7 +20,7 @@ import (
 )
 
 const MaxFileSize = 200 * 1024 * 1024 // 200MB
-const MaxFilenameLength = 50          // Maximum filename length
+const MaxFilenameLength = 255         // Maximum filename length
 
 // sanitizeFilename removes dangerous characters from filename for safe header usage
 // Prevents XSS attacks via Content-Disposition header
