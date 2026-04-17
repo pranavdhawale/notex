@@ -78,6 +78,18 @@ func (rc *RoomCache) UpdateLock(slug string, locked bool) {
 	}
 }
 
+// UpdateExpiry updates the expire_at for a cached room.
+// Uses $max semantics: only updates if the new expiry is greater than the current one.
+// This keeps the cache in sync with the database after TTL refreshes.
+func (rc *RoomCache) UpdateExpiry(slug string, expireAt time.Time) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+
+	if info, exists := rc.rooms[slug]; exists && expireAt.After(info.ExpireAt) {
+		info.ExpireAt = expireAt
+	}
+}
+
 // Cleanup removes expired entries from cache
 // Should be called periodically to prevent memory bloat
 func (rc *RoomCache) Cleanup() int {
