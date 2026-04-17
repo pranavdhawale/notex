@@ -10,7 +10,8 @@ import (
 )
 
 // StartImageCleanupJob starts a background goroutine that periodically
-// cleans up orphaned images (ref_count=0 and last_used_at older than 1 hour).
+// cleans up unused images (ref_count=0 and last_used_at older than 1 hour,
+// plus images whose room no longer exists).
 // Returns a stop channel to gracefully shutdown the cleanup goroutine.
 func StartImageCleanupJob(interval time.Duration) chan struct{} {
 	stopCh := make(chan struct{})
@@ -21,7 +22,7 @@ func StartImageCleanupJob(interval time.Duration) chan struct{} {
 		for {
 			select {
 			case <-ticker.C:
-				cleanupOrphanedImages()
+				cleanupUnusedImages()
 			case <-stopCh:
 				log.Println("Image cleanup job stopped")
 				return
@@ -31,9 +32,9 @@ func StartImageCleanupJob(interval time.Duration) chan struct{} {
 	return stopCh
 }
 
-// cleanupOrphanedImages finds and removes images where ref_count=0
-// and last_used_at is older than 1 hour
-func cleanupOrphanedImages() {
+// cleanupUnusedImages finds and removes images where ref_count=0
+// and last_used_at is older than 1 hour.
+func cleanupUnusedImages() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
@@ -50,45 +51,47 @@ func cleanupOrphanedImages() {
 	// Find all orphaned images first to get their storage keys
 	cursor, err := imagesCollection.Find(ctx, filter)
 	if err != nil {
-		log.Printf("Image cleanup: failed to find orphaned images: %v", err)
+		log.Printf("Image cleanup: failed to find unused images: %v", err)
 		return
 	}
 	defer cursor.Close(ctx)
 
 	type orphanedImage struct {
-		ID         string `bson:"_id"`
-		StorageKey string `bson:"storage_key"`
+		ID           string `bson:"_id"`
+		StorageKey   string `bson:"storage_key"`
+		ThumbnailKey string `bson:"thumbnail_key"`
 	}
 
-	var orphanedImages []orphanedImage
-	if err := cursor.All(ctx, &orphanedImages); err != nil {
-		log.Printf("Image cleanup: failed to decode orphaned images: %v", err)
+	var unusedImages []orphanedImage
+	if err := cursor.All(ctx, &unusedImages); err != nil {
+		log.Printf("Image cleanup: failed to decode unused images: %v", err)
 		return
 	}
 
-	if len(orphanedImages) == 0 {
-		log.Println("Image cleanup: no orphaned images found")
+	if len(unusedImages) == 0 {
+		log.Println("Image cleanup: no unused images found")
 		return
 	}
 
-	log.Printf("Image cleanup: found %d orphaned images to clean", len(orphanedImages))
+	log.Printf("Image cleanup: found %d unused images to clean", len(unusedImages))
 
 	// Collect storage keys for batch deletion from MinIO
 	var storageKeys []string
-	var imageIDs []string
-	for _, img := range orphanedImages {
+	for _, img := range unusedImages {
 		if img.StorageKey != "" {
 			storageKeys = append(storageKeys, img.StorageKey)
 		}
-		imageIDs = append(imageIDs, img.ID)
+		if img.ThumbnailKey != "" {
+			storageKeys = append(storageKeys, img.ThumbnailKey)
+		}
 	}
 
 	// Delete from MinIO using batch operation
 	if len(storageKeys) > 0 {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		if err := state.MinIOClient.DeleteBatch(cleanupCtx, storageKeys); err != nil {
-			log.Printf("Image cleanup: failed to delete MinIO objects: %v", err)
 			cleanupCancel()
+			log.Printf("Image cleanup: failed to delete MinIO objects: %v", err)
 			return
 		}
 		cleanupCancel()
@@ -101,5 +104,5 @@ func cleanupOrphanedImages() {
 		return
 	}
 
-	log.Printf("Image cleanup: deleted %d images", result.DeletedCount)
+	log.Printf("Image cleanup: deleted %d unused images", result.DeletedCount)
 }
