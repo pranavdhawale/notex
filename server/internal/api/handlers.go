@@ -23,20 +23,14 @@ const maxConcurrentTTLUpdates = 10
 
 var ttlUpdateSemaphore = make(chan struct{}, maxConcurrentTTLUpdates)
 
-// init pre-fills the semaphore to allow immediate use
-func init() {
-	for i := 0; i < maxConcurrentTTLUpdates; i++ {
-		ttlUpdateSemaphore <- struct{}{}
-	}
-}
-
-// acquireSemaphore attempts to acquire a semaphore slot for TTL update
-// Returns true if acquired, false if at capacity
+// acquireSemaphore blocks until a semaphore slot is available or timeout elapses.
+// This ensures TTL updates are not silently dropped under load.
 func acquireSemaphore() bool {
 	select {
-	case <-ttlUpdateSemaphore:
+	case ttlUpdateSemaphore <- struct{}{}:
 		return true
-	default:
+	case <-time.After(2 * time.Second):
+		log.Printf("TTL update timed out waiting for semaphore slot")
 		return false
 	}
 }
@@ -44,7 +38,7 @@ func acquireSemaphore() bool {
 // releaseSemaphore returns a semaphore slot after TTL update completes
 func releaseSemaphore() {
 	select {
-	case ttlUpdateSemaphore <- struct{}{}:
+	case <-ttlUpdateSemaphore:
 	default:
 	}
 }
@@ -185,10 +179,10 @@ func GetRoom(c *gin.Context) {
 			if err := state.UpdateImagesTTL(s, t); err != nil {
 				log.Printf("Failed to update image TTL for room %s: %v", s, err)
 			}
+
+			// Update room cache to reflect new expiry
+			state.GetRoomCache().UpdateExpiry(s, t)
 		}(slug, newExpiry)
-	} else {
-		// If at capacity, log and skip TTL update (not critical)
-		log.Printf("TTL update queue at capacity, skipping TTL update for room %s", slug)
 	}
 
 	c.JSON(http.StatusOK, room)
@@ -416,6 +410,9 @@ func SaveRoom(c *gin.Context) {
 		log.Printf("Failed to update image TTL for room %s: %v", slug, err)
 		// Don't fail the request - images can still be cleaned up
 	}
+
+	// Update room cache to reflect new expiry
+	state.GetRoomCache().UpdateExpiry(slug, newExpiry)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Room saved"})
 }

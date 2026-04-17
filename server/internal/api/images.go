@@ -602,30 +602,26 @@ func ReconcileImageRefs(c *gin.Context) {
 	var updatedCount int
 
 	// Process each image
+	// Uses $set for ref_count to make reconciliation idempotent (avoid double-counting
+	// on repeated calls) and only updates last_used_at on increments to avoid
+	// resetting the cleanup grace period for images being removed.
 	for _, image := range images {
 		inDocument := imageIDSet[image.ID]
 
 		var update bson.M
 
-		if inDocument && image.RefCount == 0 {
-			// Image is in document but ref_count was 0 -> set to 1
+		if inDocument {
+			// Image is in the document -> set ref_count to at least 1
+			// Use $max to only increase, making reconciliation idempotent
 			update = bson.M{
-				"$set": bson.M{
-					"ref_count":   1,
-					"last_used_at": now,
-				},
-			}
-		} else if inDocument && image.RefCount > 0 {
-			// Image is in document and already has refs -> increment
-			update = bson.M{
-				"$inc": bson.M{"ref_count": 1},
+				"$max": bson.M{"ref_count": 1},
 				"$set": bson.M{"last_used_at": now},
 			}
-		} else if !inDocument && image.RefCount > 0 {
+		} else if image.RefCount > 0 {
 			// Image is not in document but has refs -> decrement
+			// Don't reset last_used_at on decrement to avoid extending the cleanup grace period
 			update = bson.M{
 				"$inc": bson.M{"ref_count": -1},
-				"$set": bson.M{"last_used_at": now},
 			}
 		} else {
 			// Image not in document and ref_count is 0 -> no change needed
@@ -674,14 +670,18 @@ func CleanupUnusedImages(c *gin.Context) {
 		return
 	}
 
-	// Find all images with ref_count = 0
+	// Find all images with ref_count = 0 that haven't been used recently
+	// 5-minute grace period prevents deleting images the user just removed
+	// from the document (they might undo the removal)
 	collection := state.MongoDatabase.Collection("images")
+	fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
 	filter := bson.M{
 		"room_id":   roomID,
 		"ref_count": 0,
+		"last_used_at": bson.M{"$lt": fiveMinutesAgo},
 	}
 
-	opts := options.Find().SetProjection(bson.M{"storage_key": 1})
+	opts := options.Find().SetProjection(bson.M{"storage_key": 1, "thumbnail_key": 1})
 	cursor, err := collection.Find(ctx, filter, opts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
@@ -698,6 +698,9 @@ func CleanupUnusedImages(c *gin.Context) {
 			continue
 		}
 		storageKeys = append(storageKeys, image.StorageKey)
+		if image.ThumbnailKey != "" {
+			storageKeys = append(storageKeys, image.ThumbnailKey)
+		}
 	}
 
 	if err := cursor.Err(); err != nil {

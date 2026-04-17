@@ -51,9 +51,9 @@ func main() {
 		log.Fatalf("Failed to ensure MinIO bucket: %v", err)
 	}
 
-	// Start background cleanup for orphaned files (runs every hour)
-	// This handles cases where MongoDB TTL expires rooms but MinIO files remain
-	cleanupStopCh := cleanup.StartOrphanedFilesCleanup(1 * time.Hour)
+	// Start background cleanup for orphaned rooms (runs daily at midnight IST)
+	// Cleans up MinIO objects and metadata for rooms deleted by MongoDB TTL
+	cleanupStopCh := cleanup.StartOrphanedFilesCleanup()
 
 	// Start image cleanup job (runs every 10 minutes)
 	// Cleans up images where ref_count=0 and last_used_at < 1 hour ago
@@ -130,12 +130,12 @@ func main() {
 		protected.DELETE("/rooms/:room/files", api.DeleteAllFiles)
 		protected.DELETE("/rooms/:room/files/:fileId", api.DeleteFile)
 		// Image routes
-		protected.POST("/rooms/:room/images", api.UploadImage)
+		protected.POST("/rooms/:room/images", middleware.RateLimitImageUpload(), api.UploadImage)
 		protected.GET("/rooms/:room/images", api.ListImages)
 		protected.GET("/rooms/:room/images/:id/raw", api.GetImageRaw)
 		protected.GET("/rooms/:room/images/:id/thumbnail", api.GetImageThumbnail)
 		protected.DELETE("/rooms/:room/images/:id", api.DeleteImage)
-		protected.POST("/rooms/:room/images/reconcile", api.ReconcileImageRefs)
+		protected.POST("/rooms/:room/images/reconcile", middleware.RateLimitImageReconcile(), api.ReconcileImageRefs)
 		protected.POST("/rooms/:room/images/cleanup", api.CleanupUnusedImages)
 		protected.POST("/rooms/:room/images/:id/save-to-files", api.SaveImageToFiles)
 		protected.POST("/rooms/:room/files/:id/insert-to-images", api.InsertFileToImages)

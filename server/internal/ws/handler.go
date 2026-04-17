@@ -155,7 +155,7 @@ func ServeWs(hub *Hub, c *gin.Context) {
 			http.Error(c.Writer, "Invalid or expired authentication token", http.StatusUnauthorized)
 			return
 		}
-		// Token is consumed (single-use) - no need to delete, already deleted by Validate
+		// Token is valid and multi-use (supports WebSocket reconnection within 1-hour window)
 	}
 
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
