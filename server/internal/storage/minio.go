@@ -155,6 +155,36 @@ func (m *MinIOClient) Copy(ctx context.Context, srcKey, dstKey string, size int6
 	return err
 }
 
+// ListObjectPrefixes returns all unique top-level prefixes (room IDs) in the bucket.
+// Used by garbage collection to find orphaned MinIO objects.
+func (m *MinIOClient) ListObjectPrefixes(ctx context.Context) ([]string, error) {
+	var prefixes []string
+	seen := make(map[string]bool)
+
+	objectsCh := m.client.ListObjects(ctx, m.bucket, minio.ListObjectsOptions{
+		Prefix:    "",
+		Recursive: false,
+	})
+
+	for obj := range objectsCh {
+		if obj.Err != nil {
+			return nil, obj.Err
+		}
+		// Object keys look like "roomSlug/uuid.ext"
+		// Extract the prefix (room slug) before the first /
+		idx := strings.Index(obj.Key, "/")
+		if idx > 0 {
+			prefix := obj.Key[:idx]
+			if !seen[prefix] {
+				seen[prefix] = true
+				prefixes = append(prefixes, prefix)
+			}
+		}
+	}
+
+	return prefixes, nil
+}
+
 // Stat returns object info (used to check if file exists)
 func (m *MinIOClient) Stat(ctx context.Context, objectName string) (minio.ObjectInfo, error) {
 	return m.client.StatObject(ctx, m.bucket, objectName, minio.StatObjectOptions{})

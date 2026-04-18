@@ -27,6 +27,7 @@ import (
 
 const MaxImageSize = 10 * 1024 * 1024 // 10MB for images
 const ThumbnailSize = 300             // Max width/height for thumbnails (300px)
+const maxRefCount = 1000              // Maximum ref_count to prevent abuse
 
 var allowedImageTypes = map[string]bool{
 	".jpg":  true,
@@ -237,6 +238,27 @@ func UploadImage(c *gin.Context) {
 		}
 	}
 
+	// Verify room still exists after upload (race condition protection)
+	roomCheckCtx2, roomCheckCancel2 := context.WithTimeout(context.Background(), 2*time.Second)
+	var stillExists models.Room
+	err = roomCollection.FindOne(roomCheckCtx2, bson.M{"slug": roomID}).Decode(&stillExists)
+	roomCheckCancel2()
+	if err != nil {
+		// Room was deleted during upload — cleanup MinIO objects
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanupCancel()
+		if cleanupErr := state.MinIOClient.Delete(cleanupCtx, storageKey); cleanupErr != nil {
+			log.Printf("Warning: failed to cleanup MinIO object %s after room deletion: %v", storageKey, cleanupErr)
+		}
+		if thumbData != nil {
+			if cleanupErr := state.MinIOClient.Delete(cleanupCtx, thumbnailKey); cleanupErr != nil {
+				log.Printf("Warning: failed to cleanup thumbnail %s after room deletion: %v", thumbnailKey, cleanupErr)
+			}
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+		return
+	}
+
 	// Create Image record with ref_count = 0
 	imageRecord := models.Image{
 		ID:           imageID,
@@ -251,7 +273,7 @@ func UploadImage(c *gin.Context) {
 		RefCount:     0,
 		LastUsedAt:   time.Now(),
 		CreatedAt:    time.Now(),
-		ExpireAt:     room.ExpireAt, // Inherit TTL from room
+		ExpireAt:     stillExists.ExpireAt, // Inherit TTL from room (fresh check)
 	}
 
 	// Update dimensions if we decoded the image
@@ -430,42 +452,37 @@ func GetImageThumbnail(c *gin.Context) {
 		return
 	}
 
-	// Determine extension and thumbnail key
+	// Determine which key to serve: thumbnail or original
 	ext := filepath.Ext(image.Name)
+	isThumbnail := image.ThumbnailKey != ""
 
-	// If no thumbnail exists, fall back to full image
-	thumbnailKey := image.ThumbnailKey
-	if thumbnailKey == "" {
-		// Legacy images without thumbnails - serve original
-		thumbnailKey = image.StorageKey
-	}
-
-	// Security: Reconstruct key from verified components
-	reconstructedKey := fmt.Sprintf("%s/%s_thumb%s", roomID, image.ID, ext)
-	if thumbnailKey == image.StorageKey {
-		// Fallback to original image
-		reconstructedKey = image.StorageKey
-	}
-
-	// Verify the key matches
-	if thumbnailKey != reconstructedKey && thumbnailKey != image.StorageKey {
-		log.Printf("Security warning: thumbnailKey mismatch for image %s in room %s", imageID, roomID)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Image integrity check failed"})
-		return
+	serveKey := image.StorageKey // default: serve original
+	if isThumbnail {
+		// Reconstruct expected thumbnail key from verified components
+		expectedKey := fmt.Sprintf("%s/%s_thumb%s", roomID, image.ID, ext)
+		if image.ThumbnailKey != expectedKey {
+			log.Printf("Security warning: thumbnailKey mismatch for image %s in room %s. Expected %s, got %s",
+				imageID, roomID, expectedKey, image.ThumbnailKey)
+			// Fall back to serving the original image
+			isThumbnail = false
+		} else {
+			serveKey = expectedKey
+		}
 	}
 
 	// Stream from MinIO
 	downloadCtx, downloadCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer downloadCancel()
 
-	reader, err := state.MinIOClient.Download(downloadCtx, thumbnailKey)
-	if err != nil {
-		// If thumbnail doesn't exist, fall back to original
+	reader, err := state.MinIOClient.Download(downloadCtx, serveKey)
+	if err != nil && isThumbnail {
+		// Thumbnail failed, fall back to original
 		reader, err = state.MinIOClient.Download(downloadCtx, image.StorageKey)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Image content missing"})
-			return
-		}
+		isThumbnail = false
+	}
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Image content missing"})
+		return
 	}
 	defer reader.Close()
 
@@ -476,7 +493,11 @@ func GetImageThumbnail(c *gin.Context) {
 	c.Header("Content-Type", contentType)
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("X-Frame-Options", "DENY")
-	c.Header("Cache-Control", "private, max-age=86400") // Cache thumbnails for 24 hours
+	if isThumbnail {
+		c.Header("Cache-Control", "private, max-age=86400") // Cache thumbnails for 24 hours
+	} else {
+		c.Header("Cache-Control", "private, max-age=3600") // Cache originals for 1 hour
+	}
 
 	c.DataFromReader(http.StatusOK, -1, contentType, reader, nil)
 }
@@ -523,14 +544,7 @@ func DeleteImage(c *gin.Context) {
 		return
 	}
 
-	// Delete from DB first
-	_, err = collection.DeleteOne(ctx, bson.M{"_id": imageID})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
-		return
-	}
-
-	// Security: Reconstruct storageKey from verified components
+	// Security: Reconstruct storageKey from verified components BEFORE deletion
 	ext := filepath.Ext(image.Name)
 	reconstructedKey := fmt.Sprintf("%s/%s%s", roomID, image.ID, ext)
 
@@ -538,11 +552,11 @@ func DeleteImage(c *gin.Context) {
 	if reconstructedKey != image.StorageKey {
 		log.Printf("Security warning: storageKey mismatch for image %s in room %s. Expected %s, got %s",
 			imageID, roomID, reconstructedKey, image.StorageKey)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Image integrity check failed"})
-		return
+		// Fall back to stored key if mismatch — metadata still exists for manual cleanup
+		reconstructedKey = image.StorageKey
 	}
 
-	// Delete from MinIO (best effort)
+	// Delete from MinIO first (best effort) — if this fails, DB record remains for retry
 	deleteCtx, deleteCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer deleteCancel()
 	if err := state.MinIOClient.Delete(deleteCtx, reconstructedKey); err != nil {
@@ -555,12 +569,19 @@ func DeleteImage(c *gin.Context) {
 		}
 	}
 
+	// Delete from DB after MinIO — metadata remains for cleanup retry if MinIO failed
+	_, err = collection.DeleteOne(ctx, bson.M{"_id": imageID})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Image deleted"})
 }
 
 // ReconcileImageRefsRequest represents the request body for ReconcileImageRefs
 type ReconcileImageRefsRequest struct {
-	ImageIDs []string `json:"imageIds" binding:"required"`
+	ImageCounts map[string]int `json:"imageCounts" binding:"required"`
 }
 
 // ReconcileImageRefs handles POST /api/rooms/:room/images/reconcile
@@ -572,12 +593,6 @@ func ReconcileImageRefs(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
-	}
-
-	// Convert imageIds list to a set for O(1) lookups
-	imageIDSet := make(map[string]bool, len(req.ImageIDs))
-	for _, id := range req.ImageIDs {
-		imageIDSet[id] = true
 	}
 
 	collection := state.MongoDatabase.Collection("images")
@@ -601,30 +616,37 @@ func ReconcileImageRefs(c *gin.Context) {
 	now := time.Now()
 	var updatedCount int
 
-	// Process each image
-	// Uses $set for ref_count to make reconciliation idempotent (avoid double-counting
-	// on repeated calls) and only updates last_used_at on increments to avoid
-	// resetting the cleanup grace period for images being removed.
+	// Process each image — set ref_count to the exact count from the document.
+	// $set makes reconciliation idempotent: repeated calls produce the same result
+	// without double-counting. Only updates last_used_at for images still in the
+	// document to avoid resetting the cleanup grace period for images being removed.
 	for _, image := range images {
-		inDocument := imageIDSet[image.ID]
+		count, inDocument := req.ImageCounts[image.ID]
 
 		var update bson.M
 
 		if inDocument {
-			// Image is in the document -> set ref_count to at least 1
-			// Use $max to only increase, making reconciliation idempotent
+			// Cap and validate ref_count from client
+			if count < 0 {
+				count = 0
+			}
+			if count > maxRefCount {
+				count = maxRefCount
+			}
 			update = bson.M{
-				"$max": bson.M{"ref_count": 1},
-				"$set": bson.M{"last_used_at": now},
+				"$set": bson.M{
+					"ref_count":   count,
+					"last_used_at": now,
+				},
 			}
 		} else if image.RefCount > 0 {
-			// Image is not in document but has refs -> decrement
-			// Don't reset last_used_at on decrement to avoid extending the cleanup grace period
+			// Image removed from document — set ref_count to 0
+			// Don't reset last_used_at to avoid extending the cleanup grace period
 			update = bson.M{
-				"$inc": bson.M{"ref_count": -1},
+				"$set": bson.M{"ref_count": 0},
 			}
 		} else {
-			// Image not in document and ref_count is 0 -> no change needed
+			// Image not in document and ref_count is already 0
 			continue
 		}
 
@@ -671,17 +693,17 @@ func CleanupUnusedImages(c *gin.Context) {
 	}
 
 	// Find all images with ref_count = 0 that haven't been used recently
-	// 5-minute grace period prevents deleting images the user just removed
+	// Grace period prevents deleting images the user just removed
 	// from the document (they might undo the removal)
 	collection := state.MongoDatabase.Collection("images")
-	fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
+	gracePeriodAgo := time.Now().Add(-state.UnusedImageGracePeriod)
 	filter := bson.M{
 		"room_id":   roomID,
 		"ref_count": 0,
-		"last_used_at": bson.M{"$lt": fiveMinutesAgo},
+		"last_used_at": bson.M{"$lt": gracePeriodAgo},
 	}
 
-	opts := options.Find().SetProjection(bson.M{"storage_key": 1, "thumbnail_key": 1})
+	opts := options.Find().SetProjection(bson.M{"_id": 1, "name": 1, "storage_key": 1, "thumbnail_key": 1})
 	cursor, err := collection.Find(ctx, filter, opts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
@@ -689,7 +711,7 @@ func CleanupUnusedImages(c *gin.Context) {
 	}
 	defer cursor.Close(ctx)
 
-	// Collect storage keys for MinIO deletion
+	// Reconstruct storage keys from verified components and collect for MinIO deletion
 	var storageKeys []string
 	for cursor.Next(ctx) {
 		var image models.Image
@@ -697,7 +719,14 @@ func CleanupUnusedImages(c *gin.Context) {
 			log.Printf("Error: failed to decode image document for cleanup: %v", err)
 			continue
 		}
-		storageKeys = append(storageKeys, image.StorageKey)
+		reconstructedKey := fmt.Sprintf("%s/%s%s", roomID, image.ID, filepath.Ext(image.Name))
+		if reconstructedKey != image.StorageKey {
+			log.Printf("Security warning: storageKey mismatch for image %s in room %s. Expected %s, got %s",
+				image.ID, roomID, reconstructedKey, image.StorageKey)
+			// Fall back to stored key if mismatch
+			reconstructedKey = image.StorageKey
+		}
+		storageKeys = append(storageKeys, reconstructedKey)
 		if image.ThumbnailKey != "" {
 			storageKeys = append(storageKeys, image.ThumbnailKey)
 		}
@@ -713,14 +742,7 @@ func CleanupUnusedImages(c *gin.Context) {
 		return
 	}
 
-	// Delete from DB
-	_, err = collection.DeleteMany(ctx, filter)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete from database"})
-		return
-	}
-
-	// Delete from MinIO using batch operation
+	// Delete from MinIO first using batch operation — if some fail, DB records remain for retry
 	batchCtx, batchCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer batchCancel()
 
@@ -728,9 +750,16 @@ func CleanupUnusedImages(c *gin.Context) {
 		log.Printf("Warning: some MinIO deletions may have failed: %v", err)
 	}
 
+	// Delete from DB after MinIO — metadata remains for cleanup retry if MinIO failed
+	result, err := collection.DeleteMany(ctx, filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete from database"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Unused images cleaned up",
-		"count":   len(storageKeys),
+		"count":   result.DeletedCount,
 	})
 }
 
@@ -866,6 +895,24 @@ func InsertFileToImages(c *gin.Context) {
 		return
 	}
 
+	// Check if an image already exists for this file (prevent duplicates)
+	imageCollection := state.MongoDatabase.Collection("images")
+	var existingImage models.Image
+	err = imageCollection.FindOne(ctx, bson.M{"source_file_id": file.ID, "room_id": roomID}).Decode(&existingImage)
+	if err == nil {
+		// Image already exists for this file, return it with duplicate flag
+		existingImage.URL = fmt.Sprintf("/api/rooms/%s/images/%s/raw", roomID, existingImage.ID)
+		if existingImage.ThumbnailKey != "" {
+			existingImage.ThumbnailURL = fmt.Sprintf("/api/rooms/%s/images/%s/thumbnail", roomID, existingImage.ID)
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"image":        existingImage,
+			"isDuplicate": true,
+		})
+		return
+	}
+	// If err != nil (not found), continue to create new image
+
 	// Get room for expiration
 	roomCollection := state.MongoDatabase.Collection("rooms")
 	var room models.Room
@@ -908,7 +955,6 @@ func InsertFileToImages(c *gin.Context) {
 	}
 
 	// Save to images collection
-	imageCollection := state.MongoDatabase.Collection("images")
 	_, err = imageCollection.InsertOne(ctx, imageRecord)
 	if err != nil {
 		// Cleanup MinIO on DB failure

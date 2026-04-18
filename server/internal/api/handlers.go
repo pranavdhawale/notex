@@ -17,32 +17,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// Semaphore to limit concurrent background TTL update goroutines
-// Prevents resource exhaustion under high load
-const maxConcurrentTTLUpdates = 10
-
-var ttlUpdateSemaphore = make(chan struct{}, maxConcurrentTTLUpdates)
-
-// acquireSemaphore blocks until a semaphore slot is available or timeout elapses.
-// This ensures TTL updates are not silently dropped under load.
-func acquireSemaphore() bool {
-	select {
-	case ttlUpdateSemaphore <- struct{}{}:
-		return true
-	case <-time.After(2 * time.Second):
-		log.Printf("TTL update timed out waiting for semaphore slot")
-		return false
-	}
-}
-
-// releaseSemaphore returns a semaphore slot after TTL update completes
-func releaseSemaphore() {
-	select {
-	case <-ttlUpdateSemaphore:
-	default:
-	}
-}
-
 type CreateRoomRequest struct {
 	Owner      string  `json:"owner" binding:"required,max=100"`
 	CustomSlug *string `json:"customSlug,omitempty"` // Optional custom slug
@@ -154,36 +128,27 @@ func GetRoom(c *gin.Context) {
 	hasContent := room.Content != nil
 
 	newExpiry := calculateExpiry(hasContent)
-	// Update ExpireAt in background (don't block read)
-	// Use semaphore to limit concurrent TTL update goroutines
-	if acquireSemaphore() {
-		go func(s string, t time.Time) {
-			defer releaseSemaphore()
-			bgCtx, bgCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer bgCancel()
-			// Use $max to atomically update expire_at only if new value is greater
-			// This prevents race conditions when multiple requests update TTL concurrently
-			_, err := collection.UpdateOne(bgCtx, bson.M{"slug": s}, bson.M{
-				"$max": bson.M{"expire_at": t},
-			})
-			if err != nil {
-				log.Printf("Failed to update room expiry for %s: %v", s, err)
-			}
 
-			// Also update file TTL to match room TTL
-			if err := state.UpdateFilesTTL(s, t); err != nil {
-				log.Printf("Failed to update file TTL for room %s: %v", s, err)
-			}
-
-			// Also update image TTL to match room TTL
-			if err := state.UpdateImagesTTL(s, t); err != nil {
-				log.Printf("Failed to update image TTL for room %s: %v", s, err)
-			}
-
-			// Update room cache to reflect new expiry
-			state.GetRoomCache().UpdateExpiry(s, t)
-		}(slug, newExpiry)
+	// Update room expire_at atomically — only move forward
+	_, err = collection.UpdateOne(ctx, bson.M{"slug": slug}, bson.M{
+		"$max": bson.M{"expire_at": newExpiry},
+	})
+	if err != nil {
+		log.Printf("Failed to update room expiry for %s: %v", slug, err)
 	}
+
+	// Update file TTL to match room TTL
+	if err := state.UpdateFilesTTL(slug, newExpiry); err != nil {
+		log.Printf("Failed to update file TTL for room %s: %v", slug, err)
+	}
+
+	// Update image TTL to match room TTL
+	if err := state.UpdateImagesTTL(slug, newExpiry); err != nil {
+		log.Printf("Failed to update image TTL for room %s: %v", slug, err)
+	}
+
+	// Update room cache to reflect new expiry
+	state.GetRoomCache().UpdateExpiry(slug, newExpiry)
 
 	c.JSON(http.StatusOK, room)
 }
@@ -214,7 +179,13 @@ func DeleteRoom(c *gin.Context) {
 		return
 	}
 
-	// 1. Delete from MinIO first (before any metadata changes)
+	// 1. Close WebSocket Connections — prevents in-flight uploads from creating data for a deleted room
+	ws.MainHub.CloseRoom(slug)
+
+	// 2. Purge all auth tokens for this room
+	state.AuthTokens.DeleteAllForRoom(slug)
+
+	// 3. Delete from MinIO — if this fails, metadata remains for GC job to retry
 	// Use DeleteByPrefix to remove all files in the room's folder
 	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cleanupCancel()
@@ -223,7 +194,7 @@ func DeleteRoom(c *gin.Context) {
 		// Continue with deletion even if MinIO cleanup fails - we can clean up orphaned files later
 	}
 
-	// 2. Use transaction for atomic deletion of room and file metadata
+	// 4. Use transaction for atomic deletion of room and file metadata
 	// This ensures we don't end up with orphaned file records if room deletion succeeds but file deletion fails
 	err = deleteRoomTransaction(ctx, slug)
 	if err != nil {
@@ -231,12 +202,6 @@ func DeleteRoom(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
-
-	// 3. Close WebSocket Connections
-	ws.MainHub.CloseRoom(slug)
-
-	// 4. Purge all auth tokens for this room
-	state.AuthTokens.DeleteAllForRoom(slug)
 
 	// 5. Invalidate room cache
 	state.GetRoomCache().Delete(slug)
