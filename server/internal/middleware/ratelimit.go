@@ -117,6 +117,12 @@ var (
 	// Image reconcile: 30 per room+user per minute
 	ImageReconcileLimiter = NewRateLimiter(30, time.Minute)
 
+	// Image list: 60 per room+user per minute
+	ImageListLimiter = NewRateLimiter(60, time.Minute)
+
+	// Image read (raw/thumbnail): 120 per room+user per minute
+	ImageReadLimiter = NewRateLimiter(120, time.Minute)
+
 	// Shutdown channel for cleanup goroutine
 	shutdownCh = make(chan struct{})
 )
@@ -251,6 +257,42 @@ func RateLimitImageReconcile() gin.HandlerFunc {
 	}
 }
 
+// RateLimitImageList limits image list requests per room+user
+func RateLimitImageList() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		room := c.Param("room")
+		userID := c.GetString("userID")
+
+		key := room + ":" + userID
+		if !ImageListLimiter.Allow(key) {
+			c.JSON(429, gin.H{
+				"error": "Too many image list requests. Please wait a moment.",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// RateLimitImageRead limits image read (raw/thumbnail) requests per room+user
+func RateLimitImageRead() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		room := c.Param("room")
+		userID := c.GetString("userID")
+
+		key := room + ":" + userID
+		if !ImageReadLimiter.Allow(key) {
+			c.JSON(429, gin.H{
+				"error": "Too many image requests. Please wait a moment.",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // Shutdown stops the cleanup goroutine
 func Shutdown() {
 	close(shutdownCh)
@@ -258,25 +300,29 @@ func Shutdown() {
 
 // AllMetrics returns metrics for all rate limiters
 type AllMetrics struct {
-	Upload   Metrics
-	Download Metrics
-	Room     Metrics
-	Save     Metrics
+	Upload         Metrics
+	Download       Metrics
+	Room           Metrics
+	Save           Metrics
 	Password       Metrics
 	ImageUpload    Metrics
 	ImageReconcile Metrics
+	ImageList      Metrics
+	ImageRead      Metrics
 }
 
 // GetAllMetrics returns metrics for all rate limiters
 func GetAllMetrics() AllMetrics {
 	return AllMetrics{
-		Upload:        UploadLimiter.GetMetrics(),
-		Download:      DownloadLimiter.GetMetrics(),
-		Room:          RoomLimiter.GetMetrics(),
-		Save:          SaveLimiter.GetMetrics(),
-		Password:      PasswordLimiter.GetMetrics(),
-		ImageUpload:   ImageUploadLimiter.GetMetrics(),
+		Upload:         UploadLimiter.GetMetrics(),
+		Download:       DownloadLimiter.GetMetrics(),
+		Room:           RoomLimiter.GetMetrics(),
+		Save:           SaveLimiter.GetMetrics(),
+		Password:       PasswordLimiter.GetMetrics(),
+		ImageUpload:    ImageUploadLimiter.GetMetrics(),
 		ImageReconcile: ImageReconcileLimiter.GetMetrics(),
+		ImageList:      ImageListLimiter.GetMetrics(),
+		ImageRead:      ImageReadLimiter.GetMetrics(),
 	}
 }
 
@@ -296,6 +342,8 @@ func init() {
 				PasswordLimiter.Cleanup()
 				ImageUploadLimiter.Cleanup()
 				ImageReconcileLimiter.Cleanup()
+				ImageListLimiter.Cleanup()
+				ImageReadLimiter.Cleanup()
 			case <-shutdownCh:
 				return
 			}

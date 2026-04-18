@@ -149,9 +149,9 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
           .run();
       }
 
-      // Track in Y.Map
-      const imageRefs = ydoc.getMap<boolean>('imageRefs');
-      imageRefs.set(newImage.id, true);
+      // Track in Y.Map — increment to preserve existing count
+      const imageRefs = ydoc.getMap<number>('imageRefs');
+      imageRefs.set(newImage.id, (imageRefs.get(newImage.id) || 0) + 1);
 
       toast.success('Image inserted');
     } catch (e: any) {

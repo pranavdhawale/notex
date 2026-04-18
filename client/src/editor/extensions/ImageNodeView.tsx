@@ -10,6 +10,7 @@ export function ImageNodeView({ node }: NodeViewProps) {
   const uploadProgress = node.attrs['data-upload-progress'] as number | null
 
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
+  const blobUrlRef = useRef<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const revokedRef = useRef<string | null>(null)
@@ -20,7 +21,7 @@ export function ImageNodeView({ node }: NodeViewProps) {
 
   // Fetch image via authenticated request and create blob URL
   const fetchImage = useCallback(async () => {
-    if (!isServerUrl || blobUrl) return
+    if (!isServerUrl || blobUrlRef.current) return
 
     setLoading(true)
     setError(null)
@@ -34,12 +35,13 @@ export function ImageNodeView({ node }: NodeViewProps) {
       }
       revokedRef.current = url
       setBlobUrl(url)
+      blobUrlRef.current = url
     } catch {
       setError('Failed to load image')
     } finally {
       setLoading(false)
     }
-  }, [src, isServerUrl, blobUrl])
+  }, [src, isServerUrl])
 
   useEffect(() => {
     if (isServerUrl && !blobUrl && !error) {
@@ -47,14 +49,16 @@ export function ImageNodeView({ node }: NodeViewProps) {
     }
   }, [isServerUrl, blobUrl, error, fetchImage])
 
-  // Cleanup blob URL on unmount
+  // Reset blob URL state when src changes (e.g., blob URL -> server URL after upload)
   useEffect(() => {
-    return () => {
-      if (revokedRef.current) {
-        URL.revokeObjectURL(revokedRef.current)
-      }
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current)
+      revokedRef.current = null
     }
-  }, [])
+    setBlobUrl(null)
+    blobUrlRef.current = null
+    setError(null)
+  }, [src])
 
   // Determine what to display
   const displayUrl = isServerUrl ? (blobUrl || '') : src
@@ -63,10 +67,16 @@ export function ImageNodeView({ node }: NodeViewProps) {
   const showUploadProgress = uploading === 'true' && uploadProgress !== null && uploadProgress < 100
 
   // Error state with retry (for authenticated fetch failures)
+  const [retrying, setRetrying] = useState(false)
+
   const handleRetry = () => {
+    setRetrying(true)
     setError(null)
     setBlobUrl(null)
+    blobUrlRef.current = null
     fetchImage()
+    // 1-second debounce to prevent rapid retries
+    setTimeout(() => setRetrying(false), 1000)
   }
 
   return (
@@ -101,8 +111,8 @@ export function ImageNodeView({ node }: NodeViewProps) {
         {error && (
           <div className="image-error-overlay">
             <span className="image-error-text">{error}</span>
-            <button className="image-error-retry" onClick={handleRetry}>
-              Retry
+            <button className="image-error-retry" onClick={handleRetry} disabled={retrying}>
+              {retrying ? 'Retrying...' : 'Retry'}
             </button>
           </div>
         )}

@@ -49,26 +49,35 @@ interface ImageGalleryPopupProps {
 }
 
 /**
- * Custom hook to fetch images via authenticated requests
- * Returns a map of imageId -> blob URL
+ * Custom hook to fetch images via authenticated requests with concurrency limiting.
+ * Returns a map of imageId -> blob URL. Fetches at most MAX_CONCURRENT_FETCHES
+ * images in parallel to avoid overwhelming the browser and server.
+ * Retries failed thumbnail fetches once with the full image URL as fallback.
  */
+const MAX_CONCURRENT_FETCHES = 6;
+const FETCH_RETRY_DELAY = 500; // ms before retrying with fallback URL
+
 function useAuthenticatedImageUrls(images: ImageData[], isOpen: boolean) {
   const [blobUrls, setBlobUrls] = useState<Map<string, string>>(new Map());
   const revokedUrlsRef = useRef<Set<string>>(new Set());
   const abortControllerRef = useRef<AbortController | null>(null);
-  const fetchedRef = useRef<Set<string>>(new Set()); // Track fetched image IDs
+  // Track fetched image IDs and their thumbnail URLs so we can re-fetch if the URL changes
+  const fetchedRef = useRef<Map<string, string>>(new Map());
+
+  // Revoke a blob URL and track it
+  const revokeUrl = useCallback((url: string) => {
+    if (!revokedUrlsRef.current.has(url)) {
+      URL.revokeObjectURL(url);
+      revokedUrlsRef.current.add(url);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {
       // Cleanup all blob URLs when popup closes
-      blobUrls.forEach((url) => {
-        if (!revokedUrlsRef.current.has(url)) {
-          URL.revokeObjectURL(url);
-          revokedUrlsRef.current.add(url);
-        }
-      });
+      blobUrls.forEach((url) => revokeUrl(url));
       setBlobUrls(new Map());
-      fetchedRef.current.clear(); // Reset fetched tracking
+      fetchedRef.current.clear();
       // Cancel in-progress fetches when popup closes
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -77,65 +86,107 @@ function useAuthenticatedImageUrls(images: ImageData[], isOpen: boolean) {
       return;
     }
 
-    // Only create new AbortController if one doesn't exist
-    if (!abortControllerRef.current) {
-      abortControllerRef.current = new AbortController();
-    }
+    // Reset fetchedRef when popup opens to ensure fresh fetches
+    // (in case component wasn't fully unmounted)
+    fetchedRef.current.clear();
+
+    // Create new AbortController for this popup session
+    abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
 
-    const fetchImage = async (image: ImageData) => {
-      // Use thumbnail URL for gallery display (much smaller file size)
-      const displayUrl = image.thumbnailUrl || image.url;
-      const isServerUrl = displayUrl && displayUrl.startsWith("/api/");
-      if (!isServerUrl) return displayUrl; // Return original URL for non-server URLs
+    const fetchWithRetry = async (image: ImageData, displayUrl: string): Promise<void> => {
+      const thumbUrl = image.thumbnailUrl || image.url;
+      const isServerUrl = thumbUrl && thumbUrl.startsWith("/api/");
+      if (!isServerUrl) return;
 
-      try {
-        const response = await api.get(displayUrl, {
-          responseType: "blob",
-          signal,
-        });
-        const blobUrl = URL.createObjectURL(response.data);
-        setBlobUrls((prev) => {
-          const next = new Map(prev);
-          // Revoke old URL if exists
-          const oldUrl = next.get(image.id);
-          if (oldUrl && !revokedUrlsRef.current.has(oldUrl)) {
-            URL.revokeObjectURL(oldUrl);
-            revokedUrlsRef.current.add(oldUrl);
+      // Try thumbnail first, then fall back to full image URL
+      const urlsToTry = [thumbUrl];
+      if (image.thumbnailUrl && image.url && image.url !== thumbUrl) {
+        urlsToTry.push(image.url);
+      }
+
+      for (const url of urlsToTry) {
+        try {
+          const response = await api.get(url, {
+            responseType: "blob",
+            signal,
+          });
+          const blobUrl = URL.createObjectURL(response.data);
+          // Mark as successfully fetched ONLY after successful download
+          fetchedRef.current.set(image.id, displayUrl);
+          setBlobUrls((prev) => {
+            const next = new Map(prev);
+            const oldUrl = next.get(image.id);
+            if (oldUrl) revokeUrl(oldUrl);
+            next.set(image.id, blobUrl);
+            return next;
+          });
+          return; // Success
+        } catch (err: any) {
+          if (err.name === "CanceledError" || err.code === "ERR_CANCELED") return;
+          // If this was the last URL to try, clear fetchedRef so we can retry later
+          if (url === urlsToTry[urlsToTry.length - 1]) {
+            fetchedRef.current.delete(image.id);
+            console.error(`Failed to fetch image ${image.id}:`, err);
+            return;
           }
-          next.set(image.id, blobUrl);
-          return next;
-        });
-      } catch (err: any) {
-        // Ignore cancellation errors
-        if (err.name === "CanceledError" || err.code === "ERR_CANCELED") {
-          return;
+          // Brief delay before retrying with fallback URL
+          await new Promise((r) => setTimeout(r, FETCH_RETRY_DELAY));
+          if (signal.aborted) return;
         }
-        console.error(`Failed to fetch thumbnail ${image.id}:`, err);
       }
     };
 
-    // Fetch all images that need authentication
-    images.forEach((image) => {
+    // Determine which images need fetching: new images or images whose URL changed
+    const imagesToFetch: ImageData[] = [];
+    for (const image of images) {
       const displayUrl = image.thumbnailUrl || image.url;
       const isServerUrl = displayUrl && displayUrl.startsWith("/api/");
-      if (isServerUrl && !fetchedRef.current.has(image.id)) {
-        fetchedRef.current.add(image.id); // Mark as fetched
-        fetchImage(image);
+      if (!isServerUrl) continue;
+
+      const previousUrl = fetchedRef.current.get(image.id);
+      if (previousUrl === undefined || previousUrl !== displayUrl) {
+        imagesToFetch.push(image);
       }
+    }
+
+    // Concurrent fetch with limit
+    let index = 0;
+    const next = (): Promise<void> | undefined => {
+      if (index >= imagesToFetch.length || signal.aborted) return undefined;
+      const image = imagesToFetch[index++];
+      const displayUrl = image.thumbnailUrl || image.url;
+      return fetchWithRetry(image, displayUrl).then(() => next() ?? undefined);
+    };
+
+    // Start up to MAX_CONCURRENT_FETCHES parallel fetches
+    const workers: Promise<void>[] = [];
+    for (let i = 0; i < Math.min(MAX_CONCURRENT_FETCHES, imagesToFetch.length); i++) {
+      const promise = next();
+      if (promise) workers.push(promise);
+    }
+
+    // Remove blob URLs for images no longer in the list
+    const currentIds = new Set(images.map((img) => img.id));
+    setBlobUrls((prev) => {
+      const next = new Map(prev);
+      for (const [id, url] of next) {
+        if (!currentIds.has(id)) {
+          revokeUrl(url);
+          next.delete(id);
+          fetchedRef.current.delete(id);
+        }
+      }
+      return next;
     });
-  }, [images, isOpen]);
+  }, [images, isOpen, revokeUrl]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      blobUrls.forEach((url) => {
-        if (!revokedUrlsRef.current.has(url)) {
-          URL.revokeObjectURL(url);
-        }
-      });
+      blobUrls.forEach((url) => revokeUrl(url));
     };
-  }, [blobUrls]);
+  }, [blobUrls, revokeUrl]);
 
   return blobUrls;
 }
@@ -172,6 +223,7 @@ export const ImageGalleryPopup: React.FC<ImageGalleryPopupProps> = ({
   const [showCleanupConfirmation, setShowCleanupConfirmation] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [refCountsVersion, setRefCountsVersion] = useState(0); // Triggers re-render when Y.Map changes
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -201,6 +253,27 @@ export const ImageGalleryPopup: React.FC<ImageGalleryPopupProps> = ({
       return displayUrl;
     },
     [blobUrls]
+  );
+
+  /**
+   * Get the effective reference count for an image.
+   * Uses live count from Y.Map if available, otherwise falls back to server count.
+   * Returns 0 if the image is not in the document.
+   */
+  const getEffectiveRefCount = useCallback(
+    (imageId: string, serverRefCount: number): number => {
+      if (ydoc) {
+        const imageRefs = ydoc.getMap<number>('imageRefs');
+        const count = imageRefs.get(imageId);
+        if (count !== undefined) {
+          return count;
+        }
+        return 0; // Image not in Y.Map means not referenced in document
+      }
+      return serverRefCount;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ydoc, refCountsVersion] // Include version to trigger re-render on Y.Map changes
   );
 
   /**
@@ -247,6 +320,23 @@ export const ImageGalleryPopup: React.FC<ImageGalleryPopupProps> = ({
       }
     };
   }, [ydoc, fetchImages, isOpen]);
+
+  /**
+   * Observe imageRefs Y.Map to trigger re-render when ref counts change
+   */
+  useEffect(() => {
+    if (!isOpen || !ydoc) return;
+
+    const imageRefs = ydoc.getMap<number>('imageRefs');
+    const observer = () => {
+      setRefCountsVersion(v => v + 1);
+    };
+    imageRefs.observe(observer);
+
+    return () => {
+      imageRefs.unobserve(observer);
+    };
+  }, [ydoc, isOpen]);
 
   /**
    * Handle escape key to close popup
@@ -455,10 +545,10 @@ export const ImageGalleryPopup: React.FC<ImageGalleryPopupProps> = ({
       })
       .run();
 
-    // Track image reference in Y.Map (presence tracking, server handles ref counting)
+    // Track image reference in Y.Map — increment to preserve existing count
     if (ydoc) {
-      const imageRefs = ydoc.getMap("imageRefs");
-      imageRefs.set(image.id, true);
+      const imageRefs = ydoc.getMap<number>("imageRefs");
+      imageRefs.set(image.id, (imageRefs.get(image.id) || 0) + 1);
     }
 
     toast.success("Image inserted");
@@ -485,11 +575,11 @@ export const ImageGalleryPopup: React.FC<ImageGalleryPopupProps> = ({
 
     editor.chain().focus().insertContent(content).run();
 
-    // Track image references (presence tracking, server handles ref counting)
+    // Track image references — increment each to preserve existing counts
     if (ydoc) {
-      const imageRefs = ydoc.getMap("imageRefs");
+      const imageRefs = ydoc.getMap<number>("imageRefs");
       selectedImages.forEach((img) => {
-        imageRefs.set(img.id, true);
+        imageRefs.set(img.id, (imageRefs.get(img.id) || 0) + 1);
       });
     }
 
@@ -585,7 +675,7 @@ export const ImageGalleryPopup: React.FC<ImageGalleryPopupProps> = ({
 
       // Remove from Y.Map imageRefs
       if (ydoc) {
-        const imageRefs = ydoc.getMap<boolean>("imageRefs");
+        const imageRefs = ydoc.getMap<number>("imageRefs");
         imageRefs.delete(imageId);
         const yMeta = ydoc.getMap("meta");
         yMeta.set("lastImageDelete", Date.now());
@@ -606,60 +696,129 @@ export const ImageGalleryPopup: React.FC<ImageGalleryPopupProps> = ({
   };
 
   /**
-   * Delete selected images
+   * Delete selected images using the batch delete endpoint.
+   * Tracks which deletions succeeded and only removes those from local state.
    */
   const deleteSelected = async () => {
     if (selectedIds.size === 0) return;
 
     setDeleting(true);
     try {
-      // Get the images to delete
+      const imageIds = Array.from(selectedIds);
       const imagesToDelete = images.filter((img) => selectedIds.has(img.id));
 
-      // Delete each selected image from backend
-      for (const imageId of selectedIds) {
-        await api.delete(`/api/rooms/${roomSlug}/images/${imageId}`);
-      }
-
-      // Remove images from editor
-      if (editor) {
-        const { state } = editor;
-        const { tr } = state;
-        let modified = false;
-
-        state.doc.descendants((node, pos) => {
-          if (node.type.name === "image") {
-            const src = node.attrs.src;
-            // Check if this image node references any of the deleted images
-            const isDeleted = imagesToDelete.some(
-              (img) => src === img.url || src === img.thumbnailUrl || (src && src.includes(img.id))
-            );
-            if (isDeleted) {
-              tr.delete(pos, pos + node.nodeSize);
-              modified = true;
-            }
-          }
+      // Use batch delete endpoint for efficiency
+      try {
+        const res = await api.post(`/api/rooms/${roomSlug}/images/batch-delete`, {
+          imageIds,
         });
+        const deletedIds = new Set<string>(res.data?.deleted || imageIds);
+        const failedIds: string[] = res.data?.failed || [];
 
-        if (modified) {
-          editor.view.dispatch(tr);
+        // Remove successfully deleted images from editor
+        const deletedImages = imagesToDelete.filter((img) => deletedIds.has(img.id));
+        if (editor && deletedImages.length > 0) {
+          const { state } = editor;
+          const { tr } = state;
+          let modified = false;
+
+          state.doc.descendants((node, pos) => {
+            if (node.type.name === "image") {
+              const src = node.attrs.src as string;
+              const isDeleted = deletedImages.some(
+                (img) => src === img.url || src === img.thumbnailUrl || (src && src.includes(img.id))
+              );
+              if (isDeleted) {
+                tr.delete(pos, pos + node.nodeSize);
+                modified = true;
+              }
+            }
+          });
+
+          if (modified) {
+            editor.view.dispatch(tr);
+          }
+        }
+
+        // Remove from Y.Map imageRefs
+        if (ydoc) {
+          const imageRefs = ydoc.getMap<number>("imageRefs");
+          deletedIds.forEach((id) => {
+            imageRefs.delete(id);
+          });
+          const yMeta = ydoc.getMap("meta");
+          yMeta.set("lastImageDelete", Date.now());
+        }
+
+        setImages((prev) => prev.filter((img) => !deletedIds.has(img.id)));
+        setSelectedIds(new Set());
+        setSelectionMode(false);
+
+        if (failedIds.length > 0) {
+          toast.warning(`Deleted ${deletedIds.size - failedIds.length} images, ${failedIds.length} failed`);
+        } else {
+          toast.success(`Deleted ${deletedIds.size} image${deletedIds.size > 1 ? 's' : ''}`);
+        }
+      } catch (err: any) {
+        // Fallback: if batch endpoint is unavailable, try sequential deletes
+        console.warn("Batch delete failed, falling back to sequential:", err);
+
+        const succeededIds: string[] = [];
+        const failedIds: string[] = [];
+
+        for (const imageId of imageIds) {
+          try {
+            await api.delete(`/api/rooms/${roomSlug}/images/${imageId}`);
+            succeededIds.push(imageId);
+          } catch {
+            failedIds.push(imageId);
+          }
+        }
+
+        const succeededImages = imagesToDelete.filter((img) => succeededIds.includes(img.id));
+
+        // Remove from editor
+        if (editor && succeededImages.length > 0) {
+          const { state } = editor;
+          const { tr } = state;
+          let modified = false;
+
+          state.doc.descendants((node, pos) => {
+            if (node.type.name === "image") {
+              const src = node.attrs.src as string;
+              const isDeleted = succeededImages.some(
+                (img) => src === img.url || src === img.thumbnailUrl || (src && src.includes(img.id))
+              );
+              if (isDeleted) {
+                tr.delete(pos, pos + node.nodeSize);
+                modified = true;
+              }
+            }
+          });
+
+          if (modified) {
+            editor.view.dispatch(tr);
+          }
+        }
+
+        // Remove from Y.Map
+        if (ydoc) {
+          const imageRefs = ydoc.getMap<number>("imageRefs");
+          succeededIds.forEach((id) => imageRefs.delete(id));
+          const yMeta = ydoc.getMap("meta");
+          yMeta.set("lastImageDelete", Date.now());
+        }
+
+        setImages((prev) => prev.filter((img) => !succeededIds.includes(img.id)));
+        setSelectedIds(new Set());
+        setSelectionMode(false);
+
+        if (failedIds.length > 0) {
+          toast.warning(`Deleted ${succeededIds.length} images, ${failedIds.length} failed`);
+        } else {
+          toast.success(`Deleted ${succeededIds.length} image${succeededIds.length > 1 ? 's' : ''}`);
         }
       }
-
-      // Remove from Y.Map imageRefs
-      if (ydoc) {
-        const imageRefs = ydoc.getMap<boolean>("imageRefs");
-        imagesToDelete.forEach((img) => {
-          imageRefs.delete(img.id);
-        });
-        const yMeta = ydoc.getMap("meta");
-        yMeta.set("lastImageDelete", Date.now());
-      }
-
-      setImages((prev) => prev.filter((img) => !selectedIds.has(img.id)));
-      setSelectedIds(new Set());
-      setSelectionMode(false);
-      toast.success(`Deleted ${selectedIds.size} images`);
     } catch (err) {
       console.error("Failed to delete images:", err);
       toast.error("Failed to delete some images");
@@ -786,7 +945,9 @@ export const ImageGalleryPopup: React.FC<ImageGalleryPopupProps> = ({
 
   if (!isOpen) return null;
 
-  const unusedCount = images.filter((img) => img.refCount === 0).length;
+  const unusedCount = images.filter(
+    (img) => getEffectiveRefCount(img.id, img.refCount) === 0
+  ).length;
   const hasSelection = selectedIds.size > 0;
 
   return createPortal(
@@ -896,17 +1057,32 @@ export const ImageGalleryPopup: React.FC<ImageGalleryPopupProps> = ({
                           <div className="image-loading-thumb">
                             <Loader2 size={16} className="animate-spin" />
                           </div>
-                        ) : (
-                          <img
-                            src={displayUrl}
-                            alt={image.name}
-                            loading="lazy"
-                            onError={(e) => {
-                              // Fallback if image fails to load
-                              (e.target as HTMLImageElement).style.display = "none";
-                            }}
-                          />
-                        )}
+                        ) : displayUrl ? (
+                          <>
+                            <img
+                              src={displayUrl}
+                              alt={image.name}
+                              loading="lazy"
+                              onError={(e) => {
+                                const img = e.target as HTMLImageElement;
+                                // If thumbnail blob URL failed, fall back to full image URL
+                                const fallback = image.url;
+                                if (fallback && img.src !== fallback && !img.dataset.retried) {
+                                  img.dataset.retried = "1";
+                                  img.src = fallback;
+                                } else {
+                                  // Full image also failed — show placeholder
+                                  img.style.display = "none";
+                                  const placeholder = img.nextElementSibling as HTMLElement;
+                                  if (placeholder) placeholder.style.display = "flex";
+                                }
+                              }}
+                            />
+                            <div className="image-error-placeholder" style={{ display: "none", position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>
+                              <ImageIcon size={20} />
+                            </div>
+                          </>
+                        ) : null}
                       </div>
 
                       {/* Checkbox overlay (top-left, visible on hover) */}
@@ -955,12 +1131,42 @@ export const ImageGalleryPopup: React.FC<ImageGalleryPopupProps> = ({
                         </span>
                       </div>
 
-                      {/* Unused indicator */}
-                      {image.refCount === 0 && (
-                        <div className="image-unused-badge" title="Not used in document">
-                          0
-                        </div>
-                      )}
+                      {/* Reference count indicator */}
+                      {(() => {
+                        const effectiveCount = getEffectiveRefCount(
+                          image.id,
+                          image.refCount
+                        );
+                        if (effectiveCount === 0) {
+                          return (
+                            <div
+                              className="image-unused-badge"
+                              title="Not used in document"
+                            >
+                              0
+                            </div>
+                          );
+                        }
+                        if (effectiveCount === 1) {
+                          return (
+                            <div
+                              className="image-used-badge"
+                              style={{ background: "rgba(100, 100, 100, 0.7)" }}
+                              title="Used 1 time in document"
+                            >
+                              1
+                            </div>
+                          );
+                        }
+                        return (
+                          <div
+                            className="image-used-badge"
+                            title={`Used ${effectiveCount} times in document`}
+                          >
+                            {effectiveCount}
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}

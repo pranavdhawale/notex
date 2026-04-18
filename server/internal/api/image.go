@@ -31,7 +31,9 @@ func contentTypeForExt(ext string) string {
 	}
 }
 
-// ServeImage streams an image file inline (for rendering in <img> tags).
+// ServeImage streams a file attachment inline as an image (for rendering in <img> tags).
+// Note: Despite the name, this serves from the "files" collection, not "images".
+// It is used when a file attachment happens to be an image and needs to be rendered inline.
 // Unlike DownloadFile, this sets Content-Type to the actual image type
 // and does NOT set Content-Disposition: attachment.
 func ServeImage(c *gin.Context) {

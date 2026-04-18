@@ -59,6 +59,11 @@ func main() {
 	// Cleans up images where ref_count=0 and last_used_at < 1 hour ago
 	imageCleanupStopCh := cleanup.StartImageCleanupJob(10 * time.Minute)
 
+	// Start MinIO garbage collection (runs every 6 hours)
+	// Scans MinIO for object prefixes whose rooms no longer exist in MongoDB
+	// and deletes them. This is the last line of defense against orphaned objects.
+	minioGCStopCh := cleanup.StartMinIOGCJob(6 * time.Hour)
+
 	// Start room cache cleanup (runs every 10 minutes)
 	// Removes expired room entries from in-memory cache
 	roomCacheStopCh := state.StartRoomCacheCleanup(10 * time.Minute)
@@ -131,12 +136,13 @@ func main() {
 		protected.DELETE("/rooms/:room/files/:fileId", api.DeleteFile)
 		// Image routes
 		protected.POST("/rooms/:room/images", middleware.RateLimitImageUpload(), api.UploadImage)
-		protected.GET("/rooms/:room/images", api.ListImages)
-		protected.GET("/rooms/:room/images/:id/raw", api.GetImageRaw)
-		protected.GET("/rooms/:room/images/:id/thumbnail", api.GetImageThumbnail)
-		protected.DELETE("/rooms/:room/images/:id", api.DeleteImage)
+		protected.POST("/rooms/:room/images/batch-delete", api.BatchDeleteImages)
 		protected.POST("/rooms/:room/images/reconcile", middleware.RateLimitImageReconcile(), api.ReconcileImageRefs)
 		protected.POST("/rooms/:room/images/cleanup", api.CleanupUnusedImages)
+		protected.GET("/rooms/:room/images", middleware.RateLimitImageList(), api.ListImages)
+		protected.GET("/rooms/:room/images/:id/raw", middleware.RateLimitImageRead(), api.GetImageRaw)
+		protected.GET("/rooms/:room/images/:id/thumbnail", middleware.RateLimitImageRead(), api.GetImageThumbnail)
+		protected.DELETE("/rooms/:room/images/:id", api.DeleteImage)
 		protected.POST("/rooms/:room/images/:id/save-to-files", api.SaveImageToFiles)
 		protected.POST("/rooms/:room/files/:id/insert-to-images", api.InsertFileToImages)
 	}
@@ -179,6 +185,7 @@ func main() {
 	ws.MainHub.Stop()
 	close(cleanupStopCh)
 	close(imageCleanupStopCh)
+	close(minioGCStopCh)
 	close(roomCacheStopCh)
 
 	// Stop rate limiter cleanup goroutine

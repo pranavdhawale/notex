@@ -54,6 +54,8 @@ interface EditorProps {
 export type EditorRef = {
   focus: () => void;
   getEditor: () => ReturnType<typeof useEditor>;
+  getImageCounts: () => Map<string, number>;
+  triggerReconcile: () => Promise<void>;
 };
 
 const TiptapEditor = forwardRef<EditorRef, {
@@ -165,6 +167,15 @@ const TiptapEditor = forwardRef<EditorRef, {
             }
           });
           URL.revokeObjectURL(blobUrl);
+
+          // Track image reference in Y.Map — increment to avoid overwriting existing count
+          const imageIdMatch = serverUrl.match(/\/api\/rooms\/[^/]+\/images\/([^/]+)\/raw/);
+          if (imageIdMatch) {
+            const ydoc = provider.doc;
+            const imageRefs = ydoc.getMap<number>('imageRefs');
+            const id = imageIdMatch[1];
+            imageRefs.set(id, (imageRefs.get(id) || 0) + 1);
+          }
         } else {
           // Upload failed — show error state
           editor.state.doc.nodesBetween(nodePos, nodePos + 1, (node, offset) => {
@@ -304,55 +315,90 @@ const TiptapEditor = forwardRef<EditorRef, {
       editor?.commands.focus();
     },
     getEditor: () => editor,
-  }), [editor]);
+    getImageCounts: () => {
+      const ydoc = provider.doc;
+      const imageRefs = ydoc.getMap<number>('imageRefs');
+      return new Map(imageRefs.entries());
+    },
+    triggerReconcile: async () => {
+      const ydoc = provider.doc;
+      const imageRefs = ydoc.getMap<number>('imageRefs');
+      const imageCounts = Object.fromEntries(imageRefs.entries());
+      await api.post(`/api/rooms/${roomSlug}/images/reconcile`, { imageCounts });
+    },
+  }), [editor, provider.doc, roomSlug]);
 
   // Track image references in Y.Map for GC coordination
   useEffect(() => {
     if (!editor) return;
 
     const ydoc = provider.doc;
-    const imageRefs = ydoc.getMap<boolean>('imageRefs');
+    const imageRefs = ydoc.getMap<number>('imageRefs');
 
     const syncImageRefs = () => {
-      const currentImageIds = new Set<string>();
+      const imageCounts = new Map<string, number>();
 
+      // Use ProseMirror's descendants but skip non-image subtrees early
       editor.state.doc.descendants((node) => {
         if (node.type.name === 'image') {
           const src = node.attrs.src as string;
           if (src && typeof src === 'string') {
-            // Match /images/:id/raw OR /files/:id/image OR /api/rooms/:roomSlug/files/:id/image
-            const match = src.match(/\/(?:images|files)\/([^/]+)\/(?:raw|image)/);
+            const match = src.match(/\/api\/rooms\/[^/]+\/(?:images|files)\/([^/]+)\/(?:raw|image|thumbnail)/);
+            if (!match && src.startsWith('/api/rooms/')) {
+              console.warn('Unrecognized image URL pattern:', src);
+            }
             if (match) {
-              currentImageIds.add(match[1]);
+              const id = match[1];
+              imageCounts.set(id, (imageCounts.get(id) || 0) + 1);
             }
           }
         }
       });
 
-      // Sync with Y.Map
-      const existingRefs = new Set(imageRefs.keys());
+      // Batch Y.Map updates: collect changes first, then apply in one transaction
+      const entriesToSet: [string, number][] = [];
 
-      currentImageIds.forEach((id) => {
-        if (!existingRefs.has(id)) {
-          imageRefs.set(id, true);
+      for (const [id, count] of imageCounts) {
+        if (imageRefs.get(id) !== count) {
+          entriesToSet.push([id, count]);
         }
-      });
+      }
 
-      existingRefs.forEach((id) => {
-        if (!currentImageIds.has(id)) {
-          imageRefs.delete(id);
+      // Set ref_count=0 for images no longer in the document instead of deleting.
+      // Deleting causes race conditions in collaborative editing where one client
+      // can remove a ref that another client just set. Setting to 0 preserves the key
+      // and lets the server-side ReconcileImageRefs handle cleanup correctly.
+      for (const key of Array.from(imageRefs.keys())) {
+        if (!imageCounts.has(key) && imageRefs.get(key) !== 0) {
+          entriesToSet.push([key, 0]);
         }
-      });
+      }
+
+      // Only modify Y.Map if there are actual changes
+      if (entriesToSet.length > 0) {
+        ydoc.transact(() => {
+          for (const [id, count] of entriesToSet) {
+            imageRefs.set(id, count);
+          }
+        });
+      }
     };
 
     // Initial sync
     syncImageRefs();
 
-    // Sync on every editor update
-    editor.on('update', syncImageRefs);
+    // Debounced sync on editor updates to prevent potential infinite loops
+    let syncTimeout: ReturnType<typeof setTimeout>;
+    const debouncedSyncImageRefs = () => {
+      clearTimeout(syncTimeout);
+      syncTimeout = setTimeout(syncImageRefs, 100);
+    };
+
+    editor.on('update', debouncedSyncImageRefs);
 
     return () => {
-      editor.off('update', syncImageRefs);
+      editor.off('update', debouncedSyncImageRefs);
+      clearTimeout(syncTimeout);
     };
   }, [editor, provider.doc]);
 
@@ -804,11 +850,8 @@ export const Editor: React.FC<EditorProps> = ({
 
       const newImage = res.data;
 
-      // Track image ID in Y.Map for GC coordination
+      // Signal other clients via Yjs metadata
       if (ydoc) {
-        const imageRefs = ydoc.getMap<boolean>('imageRefs');
-        imageRefs.set(newImage.id, true);
-
         const yMeta = ydoc.getMap("meta");
         yMeta.set("lastUpload", Date.now());
       }
@@ -1082,12 +1125,12 @@ export const Editor: React.FC<EditorProps> = ({
         reader.readAsDataURL(blob);
       });
 
-      const imageRefs = ydoc.getMap<boolean>('imageRefs');
-      const activeImageIds = Array.from(imageRefs.keys());
+      const imageRefs = ydoc.getMap<number>('imageRefs');
+      const imageCounts = Object.fromEntries(imageRefs.entries());
 
       await Promise.all([
         api.post(`/api/rooms/${roomSlug}/save`, { content: base64 }),
-        api.post(`/api/rooms/${roomSlug}/images/reconcile`, { imageIds: activeImageIds }),
+        api.post(`/api/rooms/${roomSlug}/images/reconcile`, { imageCounts }),
       ]);
 
       if (!silent) toast.success("Saved!");
@@ -1250,6 +1293,7 @@ export const Editor: React.FC<EditorProps> = ({
 
       {/* Image Gallery Popup */}
       <ImageGalleryPopup
+        key={`gallery-${showImageGallery}-${roomSlug}`}
         isOpen={showImageGallery}
         onClose={() => {
           setShowImageGallery(false);
