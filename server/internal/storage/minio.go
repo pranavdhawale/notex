@@ -109,7 +109,9 @@ func (m *MinIOClient) DeleteByPrefix(ctx context.Context, prefix string) error {
 }
 
 // DeleteBatch removes multiple files in a single batch operation.
-// Returns nil if all deletions succeed, or an aggregated error if any fail.
+// Returns nil if all deletions succeed, or an aggregated error with per-object details.
+// Callers can inspect the error message to identify which specific objects failed
+// and decide whether to proceed with metadata deletion.
 func (m *MinIOClient) DeleteBatch(ctx context.Context, objectNames []string) error {
 	if len(objectNames) == 0 {
 		return nil
@@ -126,16 +128,17 @@ func (m *MinIOClient) DeleteBatch(ctx context.Context, objectNames []string) err
 
 	errorCh := m.client.RemoveObjects(ctx, m.bucket, deleteCh, minio.RemoveObjectsOptions{})
 
-	var errors []string
+	var failedObjects []string
 	for err := range errorCh {
 		if err.Err != nil {
 			log.Printf("Warning: failed to delete object %s: %v", err.ObjectName, err.Err)
-			errors = append(errors, fmt.Sprintf("%s: %v", err.ObjectName, err.Err))
+			failedObjects = append(failedObjects, err.ObjectName)
 		}
 	}
 
-	if len(errors) > 0 {
-		return fmt.Errorf("failed to delete %d objects: %s", len(errors), strings.Join(errors, "; "))
+	if len(failedObjects) > 0 {
+		return fmt.Errorf("DeleteBatch: %d of %d objects failed: %s",
+			len(failedObjects), len(objectNames), strings.Join(failedObjects, ", "))
 	}
 	return nil
 }

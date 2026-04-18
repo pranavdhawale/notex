@@ -18,4 +18,7 @@ type File struct {
 	// - Updated when room TTL is refreshed (GetRoom, SaveRoom)
 	// - MongoDB TTL index automatically deletes expired files
 	ExpireAt time.Time `bson:"expire_at" json:"expireAt"`
+	// SourceImageID tracks the original image ID when this file was created from an image.
+	// This prevents duplicate files when saving an image back to files.
+	SourceImageID string `bson:"source_image_id,omitempty" json:"sourceImageId,omitempty"`
 }
