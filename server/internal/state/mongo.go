@@ -93,6 +93,18 @@ func createIndexes() {
 	} else {
 		log.Println("Index created on images.room_id")
 	}
+
+	// Create compound index for image cleanup queries
+	// Used by background cleanup job: ref_count=0 AND last_used_at < threshold
+	imageCleanupIndexModel := mongo.IndexModel{
+		Keys: bson.D{{Key: "ref_count", Value: 1}, {Key: "last_used_at", Value: 1}},
+	}
+	_, err = imagesCollection.Indexes().CreateOne(indexCtx, imageCleanupIndexModel)
+	if err != nil {
+		log.Printf("Warning: Failed to create images.ref_count+last_used_at compound index: %v", err)
+	} else {
+		log.Println("Compound index created on images.ref_count + images.last_used_at")
+	}
 }
 
 func InitMongo(uri string, dbName string) {
