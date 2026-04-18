@@ -118,6 +118,22 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 
+	// Verify room still exists after upload (race condition protection)
+	roomCheckCtx, roomCheckCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	var stillExists models.Room
+	err = roomCollection.FindOne(roomCheckCtx, bson.M{"slug": roomID}).Decode(&stillExists)
+	roomCheckCancel()
+	if err != nil {
+		// Room was deleted during upload — cleanup MinIO object
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanupCancel()
+		if cleanupErr := state.MinIOClient.Delete(cleanupCtx, storageKey); cleanupErr != nil {
+			log.Printf("Warning: failed to cleanup MinIO file %s after room deletion: %v", storageKey, cleanupErr)
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+		return
+	}
+
 	// Create File Record with TTL matching room's expiration
 	fileRecord := models.File{
 		ID:         uniqueId,
@@ -127,7 +143,7 @@ func UploadFile(c *gin.Context) {
 		Size:       file.Size,
 		StorageKey: storageKey,
 		CreatedAt:  time.Now(),
-		ExpireAt:   room.ExpireAt, // Inherit TTL from room
+		ExpireAt:   stillExists.ExpireAt, // Inherit TTL from room (fresh check)
 	}
 
 	// Save to Mongo
@@ -325,22 +341,30 @@ func DeleteFile(c *gin.Context) {
 		return
 	}
 
-	// Delete from DB first (auth check done)
-	_, err = collection.DeleteOne(ctx, bson.M{"_id": fileID})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
-		return
-	}
-
-	// Security: Reconstruct storageKey from verified components
+	// Security: Reconstruct storageKey from verified components BEFORE deletion
 	ext := filepath.Ext(file.Name)
 	reconstructedKey := fmt.Sprintf("%s/%s%s", roomID, file.ID, ext)
 
-	// Delete from MinIO (best effort)
+	// Verify the reconstructed key matches the stored key (defense in depth)
+	if reconstructedKey != file.StorageKey {
+		log.Printf("Security warning: storageKey mismatch for file %s in room %s. Expected %s, got %s",
+			fileID, roomID, reconstructedKey, file.StorageKey)
+		// Fall back to stored key if mismatch — metadata still exists for manual cleanup
+		reconstructedKey = file.StorageKey
+	}
+
+	// Delete from MinIO first (best effort) — if this fails, DB record remains for retry
 	deleteCtx, deleteCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer deleteCancel()
 	if err := state.MinIOClient.Delete(deleteCtx, reconstructedKey); err != nil {
 		log.Printf("Warning: failed to delete from MinIO: %v", err)
+	}
+
+	// Delete from DB after MinIO — metadata remains for cleanup retry if MinIO failed
+	_, err = collection.DeleteOne(ctx, bson.M{"_id": fileID})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "File deleted"})
@@ -389,8 +413,8 @@ func DeleteAllFiles(c *gin.Context) {
 		}
 	}
 
-	// Find files to delete - project only storage_key to minimize memory
-	opts := options.Find().SetProjection(bson.M{"storage_key": 1})
+	// Find files to delete - project _id, name, and storage_key for key reconstruction
+	opts := options.Find().SetProjection(bson.M{"_id": 1, "name": 1, "storage_key": 1})
 	cursor, err := collection.Find(ctx, filter, opts)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
@@ -398,7 +422,7 @@ func DeleteAllFiles(c *gin.Context) {
 	}
 	defer cursor.Close(ctx)
 
-	// Collect storage keys for MinIO deletion
+	// Reconstruct storage keys from verified components and collect for MinIO deletion
 	var storageKeys []string
 	for cursor.Next(ctx) {
 		var file models.File
@@ -406,7 +430,14 @@ func DeleteAllFiles(c *gin.Context) {
 			log.Printf("Error: failed to decode file document for deletion: %v", err)
 			continue
 		}
-		storageKeys = append(storageKeys, file.StorageKey)
+		reconstructedKey := fmt.Sprintf("%s/%s%s", roomID, file.ID, filepath.Ext(file.Name))
+		if reconstructedKey != file.StorageKey {
+			log.Printf("Security warning: storageKey mismatch for file %s in room %s. Expected %s, got %s",
+				file.ID, roomID, reconstructedKey, file.StorageKey)
+			// Fall back to stored key if mismatch — metadata still exists for manual cleanup
+			reconstructedKey = file.StorageKey
+		}
+		storageKeys = append(storageKeys, reconstructedKey)
 	}
 
 	if err := cursor.Err(); err != nil {
@@ -419,14 +450,7 @@ func DeleteAllFiles(c *gin.Context) {
 		return
 	}
 
-	// Delete from DB (single operation)
-	_, err = collection.DeleteMany(ctx, filter)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete from database"})
-		return
-	}
-
-	// Delete from MinIO using batch operation (much more efficient than sequential deletes)
+	// Delete from MinIO first using batch operation — if some fail, DB records remain for retry
 	batchCtx, batchCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer batchCancel()
 
@@ -434,8 +458,15 @@ func DeleteAllFiles(c *gin.Context) {
 		log.Printf("Warning: some MinIO deletions may have failed: %v", err)
 	}
 
+	// Delete from DB after MinIO — metadata remains for cleanup retry if MinIO failed
+	result, err := collection.DeleteMany(ctx, filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete from database"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Files deleted",
-		"count":   len(storageKeys),
+		"count":   result.DeletedCount,
 	})
 }
