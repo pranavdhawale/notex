@@ -248,7 +248,8 @@ export const ImageGalleryPopup: React.FC<ImageGalleryPopupProps> = ({
       const displayUrl = image.thumbnailUrl || image.url;
       const isServerUrl = displayUrl && displayUrl.startsWith("/api/");
       if (isServerUrl) {
-        return blobUrls.get(image.id) || ""; // Return blob URL or empty string while loading
+        // Return blob URL if available, otherwise fall back to server URL
+        return blobUrls.get(image.id) || displayUrl;
       }
       return displayUrl;
     },
