@@ -60,6 +60,15 @@ export function ImageNodeView({ node }: NodeViewProps) {
     setError(null)
   }, [src])
 
+  // Cleanup blob URL when component unmounts
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current)
+      }
+    }
+  }, [])
+
   // Determine what to display
   const displayUrl = isServerUrl ? (blobUrl || '') : src
 
