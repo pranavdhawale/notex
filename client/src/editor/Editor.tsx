@@ -1063,9 +1063,8 @@ export const Editor: React.FC<EditorProps> = ({
         return;
       }
 
-      // Mod + Shift + / - Toggle image gallery
-      // Check for both "?" and "/" because some browsers report e.key="/" even with Shift held
-      if (modKey && e.shiftKey && (e.key === "?" || e.key === "/")) {
+      // Mod + Shift + P - Toggle image gallery
+      if (modKey && e.shiftKey && e.key === "p") {
         e.preventDefault();
         setShowImageGallery((prev) => !prev);
         return;
