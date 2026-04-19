@@ -34,7 +34,8 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 - **Links**: Add and manage hyperlinks
 - **Text Alignment**: Left, center, right, justify
 - **Indentation**: Tab/Shift+Tab for indent/outdent
-- **Inline Images**: Drag-drop or paste images directly into the document
+- **Inline Images**: Drag-drop or paste images directly into the document with upload progress and retry on failure
+- **Slash Commands**: Type `/image` to quickly open the image gallery
 
 ### 🤝 Real-Time Collaboration
 
@@ -48,7 +49,7 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 - **Custom Slugs**: Create rooms with memorable names (`my-project`, `team-alpha`)
 - **Auto-Generated Names**: Get creative 2-word combinations (`cosmic-whale`, `daring-airedale`)
 - **Validation**: 1-2 word slugs, lowercase, alphanumeric + hyphens
-- **TTL Management**: Rooms auto-expire based on activity
+- **TTL Management**: Rooms auto-expire based on activity, with smart cascading (saving a room also extends file and image TTLs)
   - Empty rooms: 24 hours
   - Rooms with content: 7 days
 - **Room Locking**: Password-protect rooms for restricted access
@@ -63,6 +64,8 @@ We built Notex on the principle of **Zero-Friction Collaboration**.
 - **Inline Images**: Paste or drag images into the editor — they upload automatically and embed inline for all collaborators
 - **File Management**: View all files in a room
 - **Image Gallery**: Browse, insert, delete, and manage images with a dedicated gallery popup (Ctrl+Shift+/)
+- **Image Thumbnails**: Auto-generated thumbnails for faster gallery browsing
+- **Batch Image Delete**: Select and delete multiple images at once
 - **File-Image Interop**: Insert files as inline images, or save inline images back to the files collection
 
 ### ⚡ Performance & Caching
@@ -174,6 +177,7 @@ graph TD
 - **Token Store**: In-memory auth token management for locked room access (1-hour expiry)
 - **Room Cache**: In-memory room metadata cache to reduce DB lookups on WebSocket connections
 - **Cleanup Service**: Background jobs that clean orphaned files, unreferenced images, and expired tokens
+- **Graceful Shutdown**: All background goroutines (cleanup, cache, rate limiters) stop cleanly with a 30-second HTTP server drain
 
 ## 📁 Project Structure
 
@@ -210,7 +214,8 @@ notex/
 │   │   │   ├── fileIcons.tsx
 │   │   │   ├── platform.ts
 │   │   │   ├── session.ts
-│   │   │   └── SmartCacheManager.ts
+│   │   │   ├── SmartCacheManager.ts
+│   │   │   └── useRoomFiles.ts
 │   │   ├── App.tsx
 │   │   └── LandingPage.tsx
 │   └── Dockerfile
@@ -301,6 +306,7 @@ docker-compose -f docker-compose.dev.yml logs -f client
 - **Ephemeral by Default**: Rooms auto-expire based on activity
 - **Secure File Storage**: Files are safely isolated using S3-compatible object storage (MinIO)
 - **Built-in Rate Limiting**: Abuse prevention across API & file upload routes
+- **Security Hardening**: Content-Security-Policy headers, path traversal prevention, filename sanitization, and input validation
 - **No Tracking**: We don't track user behavior
 - **Open Source**: Full transparency
 
