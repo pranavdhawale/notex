@@ -15,13 +15,26 @@ const altKey = isMac ? "Opt" : "Alt";
 
 const shortcutGroups = [
   {
+    title: "Document & Room",
+    shortcuts: [
+      { action: "Save Snapshot", key: `${modKey}+S` },
+      { action: "Lock/Unlock Room", key: `${modKey}+L` },
+      { action: "Show Shortcuts", key: `${modKey}+/` },
+    ],
+  },
+  {
     title: "Text Formatting",
     shortcuts: [
       { action: "Bold", key: `${modKey}+B` },
       { action: "Italic", key: `${modKey}+I` },
-      { action: "Strikethrough", key: `${modKey}+Shift+X` },
       { action: "Underline", key: `${modKey}+U` },
+      { action: "Strikethrough", key: "—", noShortcut: true },
       { action: "Highlight", key: `${modKey}+Shift+H` },
+    ],
+  },
+  {
+    title: "Text Style",
+    shortcuts: [
       { action: "Subscript", key: `${modKey}+,` },
       { action: "Superscript", key: `${modKey}+.` },
       { action: "Text Color", key: "—", noShortcut: true },
@@ -39,17 +52,25 @@ const shortcutGroups = [
   {
     title: "Lists",
     shortcuts: [
-      { action: "Bullet List", key: `${modKey}+Shift+8` },
       { action: "Ordered List", key: `${modKey}+Shift+7` },
-      { action: "Task List", key: "—", noShortcut: true },
+      { action: "Bullet List", key: `${modKey}+Shift+8` },
+      { action: "Task List", key: `${modKey}+Shift+9` },
     ],
   },
   {
     title: "Blocks",
     shortcuts: [
       { action: "Blockquote", key: `${modKey}+Shift+B` },
-      { action: "Code Block", key: `${modKey}+${altKey}+C` },
-      { action: "Horizontal Rule", key: `${modKey}+${altKey}+-` },
+      { action: "Code Block", key: `${modKey}+Shift+C` },
+      { action: "Horizontal Rule", key: "—", noShortcut: true },
+    ],
+  },
+  {
+    title: "Insert",
+    shortcuts: [
+      { action: "Link", key: "—", noShortcut: true },
+      { action: "Image Gallery", key: `${modKey}+Shift+P` },
+      { action: "Insert Table", key: "—", noShortcut: true },
     ],
   },
   {
@@ -60,15 +81,9 @@ const shortcutGroups = [
     ],
   },
   {
-    title: "Other",
+    title: "Line Breaks",
     shortcuts: [
-      { action: "Link", key: `${modKey}+K` },
-      { action: "Insert Table", key: "—", noShortcut: true },
-      { action: "Insert Image", key: `${modKey}+Shift+/` },
       { action: "Hard Break", key: "Shift+Enter" },
-      { action: "Save Snapshot", key: `${modKey}+S` },
-      { action: "Lock/Unlock Room", key: `${modKey}+L` },
-      { action: "Shortcuts", key: `${modKey}+/` },
     ],
   },
 ];

@@ -1,9 +1,6 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import api from "../utils/api";
-import axios from "axios";
-import * as Y from "yjs";
-import type { Editor } from "@tiptap/react";
 import {
   Trash2,
   Upload,
@@ -17,6 +14,9 @@ import {
 import { ConfirmationModal } from "../components/ConfirmationModal";
 import { toast } from "../components/Toaster";
 import { getFileIcon } from "../utils/fileIcons";
+import { useRoomFiles, type FileData } from "../utils/useRoomFiles";
+import * as Y from "yjs";
+import type { Editor } from "@tiptap/react";
 
 interface FilesSidebarProps {
   roomSlug: string;
@@ -27,23 +27,6 @@ interface FilesSidebarProps {
   onFocusRestore?: () => void;
 }
 
-interface FileData {
-  id: string;
-  name: string;
-  url: string;
-  size: number;
-  type?: string;
-  uploaderId?: string;
-}
-
-interface ActiveUpload {
-  id: string;
-  name: string;
-  progress: number;
-  speed: string;
-  controller: AbortController;
-}
-
 export const FilesSidebar: React.FC<FilesSidebarProps> = ({
   roomSlug,
   ydoc,
@@ -52,16 +35,24 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
   editor,
   onFocusRestore,
 }) => {
-  const [files, setFiles] = useState<FileData[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const [activeUploads, setActiveUploads] = useState<ActiveUpload[]>([]);
-  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+  const {
+    files,
+    activeUploads,
+    isDragging,
+    setIsDragging,
+    uploadFiles,
+    uploadFile,
+    deleteFile,
+    deleteAllFiles,
+    insertAsImage,
+    cancelUpload,
+    isImageFile,
+  } = useRoomFiles(roomSlug, ydoc, userId, isRoomOwner);
 
-  // Check if a file is an image based on extension
-  const isImageFile = (filename: string): boolean => {
-    const ext = filename.split('.').pop()?.toLowerCase() || '';
-    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
-  };
+  const [showDeleteSelection, setShowDeleteSelection] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deleteScope, setDeleteScope] = useState<"me" | "all">("me");
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
 
   // Download file with authentication
   const handleDownload = async (file: FileData) => {
@@ -71,7 +62,6 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
         responseType: 'blob',
       });
 
-      // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -80,8 +70,8 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error('Download failed:', e);
+    } catch (err) {
+      console.error('Download failed:', err);
       toast.error("Failed to download file");
     } finally {
       setDownloadingFileId(null);
@@ -89,84 +79,36 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
     }
   };
 
-  const fetchFiles = useCallback(async () => {
-    try {
-      const res = await api.get(`/api/rooms/${roomSlug}/files`);
-      // API returns { files: [...], pagination: {...} }
-      const filesData = res.data.files || res.data;
-      setFiles(Array.isArray(filesData) ? filesData : []);
-    } catch (e) {
-      console.error(e);
-      setFiles([]);
-    }
-  }, [roomSlug]);
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
 
-  useEffect(() => {
-    fetchFiles();
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length === 0) return;
 
-    // Trigger refetch when metadata changes (signal from other clients)
-    const yMeta = ydoc.getMap("meta");
-    const observer = () => {
-      fetchFiles();
-    };
-    yMeta.observe(observer);
-    return () => yMeta.unobserve(observer);
-  }, [ydoc, fetchFiles]);
+    // Upload all files
+    await Promise.all(droppedFiles.map((file) => uploadFile(file)));
+    onFocusRestore?.();
+  };
 
   const handleDeleteFile = async (fileId: string) => {
     if (!confirm("Delete this file?")) return;
     try {
-      await api.delete(`/api/rooms/${roomSlug}/files/${fileId}`);
-
-      const yMeta = ydoc.getMap("meta");
-      yMeta.set("lastUpload", Date.now());
-
-      setFiles((prev) => prev.filter((f) => f.id !== fileId));
-    } catch (e) {
-      toast.error("Failed to delete file");
+      await deleteFile(fileId);
+    } catch {
+      // Error handled in hook
     }
     onFocusRestore?.();
   };
 
-  // Insert a file as an image into the document
   const handleInsertAsImage = async (fileId: string) => {
     try {
-      const res = await api.post(`/api/rooms/${roomSlug}/files/${fileId}/insert-to-images`);
-      const newImage = res.data;
-
-      // Insert at cursor
-      if (editor) {
-        editor
-          .chain()
-          .focus()
-          .insertContent({
-            type: "image",
-            attrs: {
-              src: newImage.url,
-              alt: newImage.name,
-            },
-          })
-          .run();
-      }
-
-      // Track in Y.Map — increment to preserve existing count
-      const imageRefs = ydoc.getMap<number>('imageRefs');
-      imageRefs.set(newImage.id, (imageRefs.get(newImage.id) || 0) + 1);
-
-      toast.success('Image inserted');
-    } catch (e: any) {
-      if (e.response?.data?.error) {
-        toast.error(e.response.data.error);
-      } else {
-        toast.error('Failed to insert image');
-      }
+      await insertAsImage(fileId, editor);
+    } catch {
+      // Error handled in hook
     }
     onFocusRestore?.();
   };
-
-  const [showDeleteSelection, setShowDeleteSelection] = useState(false);
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  const [deleteScope, setDeleteScope] = useState<"me" | "all">("me");
 
   const handleDeleteAllClick = () => {
     if (files.length === 0) return;
@@ -180,146 +122,18 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
 
   const confirmDeleteAll = async () => {
     try {
-      const url = `/api/rooms/${roomSlug}/files${deleteScope === "me" ? "?user=me" : ""}`;
-
-      await api.delete(url);
-
-      const yMeta = ydoc.getMap("meta");
-      yMeta.set("lastUpload", Date.now());
-
-      // Optimistic update
-      if (deleteScope === "me") {
-        setFiles((prev) => prev.filter((f) => f.uploaderId !== userId));
-      } else {
-        setFiles([]);
-      }
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to delete files");
+      await deleteAllFiles(deleteScope);
+    } catch {
+      // Error handled in hook
     }
     setShowDeleteConfirmation(false);
     onFocusRestore?.();
-  };
-
-  const cancelUpload = (uploadId: string) => {
-    setActiveUploads((prev) => {
-      const upload = prev.find((u) => u.id === uploadId);
-      if (upload) {
-        upload.controller.abort();
-      }
-      return prev.filter((u) => u.id !== uploadId);
-    });
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    if (droppedFiles.length === 0) return;
-
-    droppedFiles.forEach((file) => {
-      uploadFile(file);
-    });
-  };
-
-  const uploadFile = async (file: File) => {
-    const uploadId = Math.random().toString(36).substring(7);
-    const controller = new AbortController();
-
-    const newUpload: ActiveUpload = {
-      id: uploadId,
-      name: file.name,
-      progress: 0,
-      speed: "0 KB/s",
-      controller,
-    };
-
-    setActiveUploads((prev) => [...prev, newUpload]);
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    let lastLoaded = 0;
-    let lastTime = Date.now();
-    let lastUpdateTime = 0; // Throttle state updates
-
-    try {
-      const res = await api.post(`/api/upload/${roomSlug}`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-        timeout: 10 * 60 * 1000, // 10 minutes timeout for large files
-        signal: controller.signal,
-        onUploadProgress: (progressEvent) => {
-          const total = progressEvent.total || file.size;
-          const current = progressEvent.loaded;
-          const percentCompleted = Math.round((current * 100) / total);
-          const now = Date.now();
-
-          // Throttle state updates to 200ms to prevent excessive re-renders
-          const timeSinceLastUpdate = now - lastUpdateTime;
-          if (timeSinceLastUpdate < 200 && percentCompleted < 100) {
-            return;
-          }
-          lastUpdateTime = now;
-
-          const timeDiff = (now - lastTime) / 1000; // seconds
-
-          let speedStr = "Calculating...";
-          if (timeDiff >= 0.5) {
-            // Update speed every 500ms
-            const loadedDiff = current - lastLoaded;
-            const speed = loadedDiff / timeDiff; // bytes per second
-
-            if (speed > 1024 * 1024) {
-              speedStr = `${(speed / (1024 * 1024)).toFixed(1)} MB/s`;
-            } else {
-              speedStr = `${(speed / 1024).toFixed(1)} KB/s`;
-            }
-
-            lastLoaded = current;
-            lastTime = now;
-          }
-
-          setActiveUploads((prev) =>
-            prev.map((u) =>
-              u.id === uploadId
-                ? {
-                    ...u,
-                    progress: percentCompleted,
-                    ...(timeDiff >= 0.5 ? { speed: speedStr } : {}),
-                  }
-                : u,
-            ),
-          );
-        },
-      });
-
-      const newFile = res.data;
-      const yMeta = ydoc.getMap("meta");
-      yMeta.set("lastUpload", Date.now());
-
-      setFiles((prev) => [...(Array.isArray(prev) ? prev : []), newFile]);
-    } catch (err: any) {
-      if (axios.isCancel(err)) {
-        // Upload cancelled by user - silently ignore
-      } else if (err.response?.data?.error) {
-        // Rate limit error - show server message
-        toast.error(err.response.data.error);
-      } else {
-        toast.error(`Upload failed for ${file.name}. Max 200MB.`);
-      }
-    } finally {
-      setActiveUploads((prev) => prev.filter((u) => u.id !== uploadId));
-    }
   };
 
   return (
     <div
       className={`sidebar-panel left-panel ${isDragging ? "dragging" : ""}`}
       onMouseDown={(e) => {
-        // Prevent focus from leaving editor when clicking sidebar
         e.preventDefault();
       }}
       onDragOver={(e) => {
@@ -330,7 +144,6 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
       onDrop={handleDrop}
     >
       <div className="panel-header liquid-header">
-        {/* Liquid Glass Background */}
         <div className="liquid-glass-container">
           <div className="liquid-glass-backdrop"></div>
           <div className="liquid-glass-distortion top"></div>
@@ -359,7 +172,7 @@ export const FilesSidebar: React.FC<FilesSidebarProps> = ({
             onChange={(e) => {
               const fileList = e.target.files;
               if (fileList && fileList.length > 0) {
-                Array.from(fileList).forEach((file) => uploadFile(file));
+                uploadFiles(Array.from(fileList));
                 e.target.value = "";
               }
             }}

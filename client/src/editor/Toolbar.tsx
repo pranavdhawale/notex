@@ -270,6 +270,13 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor, onOpenImageGallery }
         >
           <SuperscriptIcon size={16} />
         </button>
+        <button
+          onClick={setLink}
+          className={`toolbar-btn-circle ${isLink ? "is-active" : ""}`}
+          title="Link"
+        >
+          <Link size={16} />
+        </button>
 
         {/* Color Picker */}
         <div ref={colorPickerRef} style={{ position: "relative" }}>
@@ -449,14 +456,7 @@ const ToolbarComponent: React.FC<ToolbarProps> = ({ editor, onOpenImageGallery }
 
         <div style={{ width: "1px", height: "24px", background: "rgba(255,255,255,0.1)", margin: "0 4px" }}></div>
 
-        {/* Links & Tables */}
-        <button
-          onClick={setLink}
-          className={`toolbar-btn-circle ${isLink ? "is-active" : ""}`}
-          title="Link"
-        >
-          <Link size={16} />
-        </button>
+        {/* Tables & Images */}
         <button
           onClick={() =>
             editor
