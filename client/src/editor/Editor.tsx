@@ -616,7 +616,7 @@ const TiptapEditor = forwardRef<EditorRef, {
                         }}
                         className="mobile-menu-item"
                       >
-                        <Key size={18} style={{ color: roomLocked ? "var(--color-primary)" : "inherit" }} />
+                        <Key size={18} style={{ color: roomLocked ? "#fbbf24" : "inherit" }} />
                         <span>{roomLocked ? "Unlock Room" : "Lock Room"}</span>
                       </button>
                     )}
@@ -640,7 +640,7 @@ const TiptapEditor = forwardRef<EditorRef, {
               <button
                 onClick={roomLocked ? onUnlockRoom : onLockRoom}
                 className="btn-icon desktop-only-btn"
-                style={{ color: roomLocked ? "var(--color-primary)" : "var(--text-secondary)" }}
+                style={{ color: roomLocked ? "#fbbf24" : "var(--text-secondary)" }}
                 title={roomLocked ? "Unlock Room" : "Lock Room"}
               >
                 <Key size={18} />
