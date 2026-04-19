@@ -188,7 +188,7 @@ function useAuthenticatedImageUrls(images: ImageData[], isOpen: boolean) {
     };
   }, [blobUrls, revokeUrl]);
 
-  return blobUrls;
+  return { blobUrls, revokeUrl };
 }
 
 /**
@@ -232,7 +232,7 @@ export const ImageGalleryPopup: React.FC<ImageGalleryPopupProps> = ({
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
   // Fetch images via authenticated requests and get blob URLs
-  const blobUrls = useAuthenticatedImageUrls(images, isOpen);
+  const { blobUrls, revokeUrl } = useAuthenticatedImageUrls(images, isOpen);
 
   // Track mounted state for async operations
   useEffect(() => {
@@ -907,18 +907,36 @@ export const ImageGalleryPopup: React.FC<ImageGalleryPopupProps> = ({
   const cleanupUnused = async () => {
     setDeleting(true);
     try {
+      // Identify unused images before cleanup to revoke their blob URLs
+      const unusedImages = images.filter(
+        (img) => getEffectiveRefCount(img.id, img.refCount) === 0
+      );
+
       const res = await api.post(`/api/rooms/${roomSlug}/images/cleanup`);
       const deletedCount = res.data.deletedCount || 0;
 
-      if (ydoc) {
-        const yMeta = ydoc.getMap("meta");
-        yMeta.set("lastImageDelete", Date.now());
+      // Only revoke/update if server actually deleted images
+      // Server has a 5-minute grace period, so it may not delete recent unused images
+      if (deletedCount > 0) {
+        // Revoke blob URLs for deleted images
+        unusedImages.forEach((img) => {
+          const blobUrl = blobUrls.get(img.id);
+          if (blobUrl) {
+            revokeUrl(blobUrl);
+          }
+        });
+
+        if (ydoc) {
+          const yMeta = ydoc.getMap("meta");
+          yMeta.set("lastImageDelete", Date.now());
+        }
+
+        // Remove deleted images from state immediately
+        const deletedIds = new Set(unusedImages.map((img) => img.id));
+        setImages((prev) => prev.filter((img) => !deletedIds.has(img.id)));
       }
 
-      // Refetch images
-      await fetchImages();
-
-      toast.success(`Cleaned up ${deletedCount} unused images`);
+      toast.success(`Cleaned up ${deletedCount} unused image${deletedCount !== 1 ? 's' : ''}`);
     } catch (err) {
       console.error("Failed to cleanup images:", err);
       toast.error("Failed to cleanup images");
