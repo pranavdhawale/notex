@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -8,57 +8,55 @@ import {
   FolderX,
   FileMinus,
   Trash2,
+  FileImage,
 } from "lucide-react";
 import { ConfirmationModal } from "../components/ConfirmationModal";
 import { toast } from "../components/Toaster";
 import api from "../utils/api";
 import { getFileIcon } from "../utils/fileIcons";
-import "./Editor.css"; // Import shared styles for file items
+import { useRoomFiles, type FileData } from "../utils/useRoomFiles";
+import * as Y from "yjs";
+import type { Editor } from "@tiptap/react";
+import "./Editor.css";
 import "./FilesModal.css";
-
-interface FileData {
-  id: string;
-  name: string;
-  url: string;
-  size: number;
-  type?: string;
-  uploaderId?: string;
-}
 
 interface FilesModalProps {
   isOpen: boolean;
   onClose: () => void;
-  files: FileData[];
-  onUpload: (file: File) => Promise<void>;
-  onDelete: (fileId: string) => Promise<void>;
-  onDeleteAll: (scope: "me" | "all") => Promise<void>;
-  uploading: boolean;
-  uploadProgress?: number;
-  uploadSpeed?: string;
-  userId: string;
   roomSlug: string;
+  ydoc: Y.Doc;
+  userId: string;
   isRoomOwner: boolean;
+  editor: Editor | null;
 }
 
 export const FilesModal: React.FC<FilesModalProps> = ({
   isOpen,
   onClose,
-  files,
-  onUpload,
-  onDelete,
-  onDeleteAll,
-  uploading,
-  uploadProgress = 0,
-  uploadSpeed = "",
-  userId,
   roomSlug,
+  ydoc,
+  userId,
   isRoomOwner,
+  editor,
 }) => {
+  const {
+    files,
+    activeUploads,
+    isDragging,
+    setIsDragging,
+    uploadFiles,
+    uploadFile,
+    deleteFile,
+    deleteAllFiles,
+    insertAsImage,
+    cancelUpload,
+    isImageFile,
+  } = useRoomFiles(roomSlug, ydoc, userId, isRoomOwner);
+
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [showDeleteSelection, setShowDeleteSelection] = React.useState(false);
-  const [showDeleteConfirmation, setShowDeleteConfirmation] =
-    React.useState(false);
-  const [deleteScope, setDeleteScope] = React.useState<"me" | "all">("me");
+  const [showDeleteSelection, setShowDeleteSelection] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deleteScope, setDeleteScope] = useState<"me" | "all">("me");
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
 
   // Download file with authentication
@@ -69,7 +67,6 @@ export const FilesModal: React.FC<FilesModalProps> = ({
         responseType: 'blob',
       });
 
-      // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -78,34 +75,38 @@ export const FilesModal: React.FC<FilesModalProps> = ({
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error('Download failed:', e);
+    } catch (err) {
+      console.error('Download failed:', err);
       toast.error("Failed to download file");
     } finally {
       setDownloadingFileId(null);
     }
   };
 
-  // Close modals on Escape key
-  useEffect(() => {
-    if (!isOpen) return;
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
 
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (showDeleteConfirmation) setShowDeleteConfirmation(false);
-        else if (showDeleteSelection) setShowDeleteSelection(false);
-        else onClose(); // Close main modal if no sub-modals open
-      }
-    };
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
 
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [showDeleteSelection, showDeleteConfirmation, isOpen, onClose]);
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length === 0) return;
+
+    await Promise.all(droppedFiles.map((file) => uploadFile(file)));
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      await onUpload(file);
+    const fileList = e.target.files;
+    if (fileList && fileList.length > 0) {
+      await uploadFiles(Array.from(fileList));
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -123,21 +124,63 @@ export const FilesModal: React.FC<FilesModalProps> = ({
   };
 
   const confirmDeleteAll = async () => {
-    await onDeleteAll(deleteScope);
-    setShowDeleteConfirmation(false); // Close after confirming
+    try {
+      await deleteAllFiles(deleteScope);
+    } catch {
+      // Error handled in hook
+    }
+    setShowDeleteConfirmation(false);
   };
+
+  const handleDeleteFile = async (fileId: string) => {
+    try {
+      await deleteFile(fileId);
+    } catch {
+      // Error handled in hook
+    }
+  };
+
+  const handleInsertAsImage = async (fileId: string) => {
+    try {
+      await insertAsImage(fileId, editor);
+    } catch {
+      // Error handled in hook
+    }
+  };
+
+  // Close modals on Escape key
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (showDeleteConfirmation) setShowDeleteConfirmation(false);
+        else if (showDeleteSelection) setShowDeleteSelection(false);
+        else onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [showDeleteSelection, showDeleteConfirmation, isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return (
     <>
-      <div className="files-modal-overlay" onClick={onClose}>
+      <div
+        className={`files-modal-overlay ${isDragging ? 'dragging' : ''}`}
+        onClick={onClose}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <div
           className="files-modal-content"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="files-modal-header">
-            <h3>Files</h3>
+            <h3>Files <span className="badge">{files.length}</span></h3>
             <div style={{ display: "flex", gap: "8px" }}>
               {files.length > 0 && (
                 <button
@@ -156,10 +199,49 @@ export const FilesModal: React.FC<FilesModalProps> = ({
           </div>
 
           <div className="files-modal-body">
-            {files.length === 0 ? (
+            {/* Drag overlay */}
+            {isDragging && (
+              <div className="drag-overlay">
+                <Upload size={48} />
+                <p>Drop files to upload</p>
+              </div>
+            )}
+
+            {/* Active uploads */}
+            {activeUploads.length > 0 && (
+              <div className="active-uploads">
+                {activeUploads.map((upload) => (
+                  <div key={upload.id} className="upload-item-glass">
+                    <div className="upload-header">
+                      <div className="upload-info">
+                        <span className="upload-name">{upload.name}</span>
+                        <span className="upload-meta">
+                          {upload.speed} • {upload.progress}%
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => cancelUpload(upload.id)}
+                        className="btn-icon delete"
+                        title="Cancel"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                    <div className="progress-bar-container">
+                      <div
+                        className="progress-bar-fill"
+                        style={{ width: `${upload.progress}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {files.length === 0 && activeUploads.length === 0 ? (
               <div className="empty-state">
                 <Upload size={32} opacity={0.5} />
-                <p>No files yet</p>
+                <p>Drop files here or click upload</p>
                 <p style={{ fontSize: "0.75rem", opacity: 0.5, marginTop: "4px" }}>
                   Max 10 uploads/min
                 </p>
@@ -184,10 +266,7 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                         {(f.size / 1024 / 1024).toFixed(2)} MB
                       </span>
                     </div>
-                    <div
-                      className="file-actions"
-                      style={{ display: "flex", gap: "4px" }}
-                    >
+                    <div className="file-actions">
                       <button
                         onClick={() => handleDownload(f)}
                         className="btn-icon"
@@ -200,9 +279,18 @@ export const FilesModal: React.FC<FilesModalProps> = ({
                           <Download size={14} />
                         )}
                       </button>
+                      {isImageFile(f.name) && (
+                        <button
+                          onClick={() => handleInsertAsImage(f.id)}
+                          className="btn-icon"
+                          title="Insert in Document"
+                        >
+                          <FileImage size={14} />
+                        </button>
+                      )}
                       {canDelete && (
                         <button
-                          onClick={() => onDelete(f.id)}
+                          onClick={() => handleDeleteFile(f.id)}
                           className="btn-icon delete"
                           title="Delete"
                         >
@@ -216,73 +304,26 @@ export const FilesModal: React.FC<FilesModalProps> = ({
             )}
           </div>
 
-          <div
-            className="files-modal-footer"
-            style={{ flexDirection: "column", gap: "10px" }}
-          >
-            {uploading && (
-              <div style={{ width: "100%", padding: "0 10px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: "4px",
-                    fontSize: "12px",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  <span>Uploading...</span>
-                  <span>
-                    {uploadSpeed} • {uploadProgress}%
-                  </span>
-                </div>
-                <div
-                  style={{
-                    width: "100%",
-                    height: "4px",
-                    background: "rgba(255,255,255,0.1)",
-                    borderRadius: "2px",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${uploadProgress}%`,
-                      height: "100%",
-                      background: "var(--accent-color, #3b82f6)",
-                      transition: "width 0.2s ease-out",
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-            <div
-              style={{
-                display: "flex",
-                width: "100%",
-                justifyContent: "flex-end",
-              }}
+          <div className="files-modal-footer">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileSelect}
+              style={{ display: "none" }}
+            />
+            <button
+              className="upload-button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={activeUploads.length > 0}
             >
-              <input
-                ref={fileInputRef}
-                type="file"
-                onChange={handleFileSelect}
-                style={{ display: "none" }}
-              />
-              <button
-                className="upload-button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                style={{ width: "auto" }}
-              >
-                {uploading ? (
-                  <Loader2 className="animate-spin" size={18} />
-                ) : (
-                  <Upload size={18} />
-                )}
-                {uploading ? "Uploading..." : "Upload File"}
-              </button>
-            </div>
+              {activeUploads.length > 0 ? (
+                <Loader2 className="animate-spin" size={18} />
+              ) : (
+                <Upload size={18} />
+              )}
+              {activeUploads.length > 0 ? "Uploading..." : "Upload Files"}
+            </button>
           </div>
         </div>
       </div>
