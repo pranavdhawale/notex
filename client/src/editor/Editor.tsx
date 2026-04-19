@@ -31,7 +31,7 @@ import { ActiveUsersAvatars } from "../components/ActiveUsersAvatars";
 import { Toolbar } from "./Toolbar";
 import { TableContextMenu } from "./TableContextMenu";
 import api, { getWebSocketBaseUrl } from "../utils/api";
-import { LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown, Key, Menu, MapPin } from "lucide-react";
+import { LogOut, Trash, Save, Loader2, File, ArrowUp, ArrowDown, Key, Menu, MapPin, Image as ImageIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cacheManager } from "../utils/SmartCacheManager";
 import { NotFoundView } from "../components/NotFoundView";
@@ -629,6 +629,16 @@ const TiptapEditor = forwardRef<EditorRef, {
                     >
                       <File size={18} />
                       <span>Files</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        onOpenImageGallery?.();
+                      }}
+                      className="mobile-menu-item"
+                    >
+                      <ImageIcon size={18} />
+                      <span>Images</span>
                     </button>
                   </div>
                 </>
