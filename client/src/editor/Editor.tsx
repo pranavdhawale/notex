@@ -733,8 +733,6 @@ export const Editor: React.FC<EditorProps> = ({
   const [showFilesModal, setShowFilesModal] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showImageGallery, setShowImageGallery] = useState(false);
-  const [files, setFiles] = useState<any[]>([]);
-  const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
 
   // Editor ref for focus management
@@ -775,68 +773,6 @@ export const Editor: React.FC<EditorProps> = ({
     }
   };
 
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadSpeed, setUploadSpeed] = useState("");
-
-  const handleFileUpload = async (file: File) => {
-    setUploading(true);
-    setUploadProgress(0);
-    setUploadSpeed("0 KB/s");
-    const formData = new FormData();
-    formData.append("file", file);
-
-    let lastLoaded = 0;
-    let lastTime = Date.now();
-
-    try {
-      const res = await api.post(`/api/upload/${roomSlug}`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-        timeout: 10 * 60 * 1000,
-        onUploadProgress: (progressEvent) => {
-          const total = progressEvent.total || file.size;
-          const current = progressEvent.loaded;
-          const percentCompleted = Math.round((current * 100) / total);
-          setUploadProgress(percentCompleted);
-
-          const now = Date.now();
-          const timeDiff = (now - lastTime) / 1000;
-          if (timeDiff >= 0.5) {
-            const loadedDiff = current - lastLoaded;
-            const speed = loadedDiff / timeDiff;
-            if (speed > 1024 * 1024) {
-              setUploadSpeed(`${(speed / (1024 * 1024)).toFixed(1)} MB/s`);
-            } else {
-              setUploadSpeed(`${(speed / 1024).toFixed(1)} KB/s`);
-            }
-            lastLoaded = current;
-            lastTime = now;
-          }
-        },
-      });
-
-      const newFile = res.data;
-      if (ydoc) {
-        const yMeta = ydoc.getMap("meta");
-        yMeta.set("lastUpload", Date.now());
-      }
-
-      setFiles((prev) => [...prev, newFile]);
-    } catch (err: any) {
-      if (err.response?.data?.error) {
-        // Server returned an error message - show it
-        toast.error(err.response.data.error);
-      } else {
-        toast.error("Upload failed. Max 200MB.");
-      }
-    } finally {
-      setUploading(false);
-      setUploadProgress(0);
-      setUploadSpeed("");
-    }
-  };
-
   // Upload an image file and return the server URL for inline embedding
   const handleImageUpload = async (file: File): Promise<string | null> => {
     const formData = new FormData();
@@ -865,45 +801,6 @@ export const Editor: React.FC<EditorProps> = ({
         toast.error(`Failed to upload image "${file.name}".`);
       }
       return null;
-    }
-  };
-
-  const handleFileDelete = async (fileId: string) => {
-    if (!confirm("Delete this file?")) return;
-    try {
-      await api.delete(`/api/rooms/${roomSlug}/files/${fileId}`);
-
-      if (ydoc) {
-        const yMeta = ydoc.getMap("meta");
-        yMeta.set("lastUpload", Date.now());
-      }
-
-      setFiles((prev) => prev.filter((f) => f.id !== fileId));
-    } catch (e) {
-      toast.error("Failed to delete file");
-    }
-  };
-
-  const handleDeleteAll = async (scope: "me" | "all") => {
-    try {
-      const url = `/api/rooms/${roomSlug}/files${scope === "me" ? "?user=me" : ""}`;
-
-      await api.delete(url);
-
-      if (ydoc) {
-        const yMeta = ydoc.getMap("meta");
-        yMeta.set("lastUpload", Date.now());
-      }
-
-      // Optimistic update
-      if (scope === "me") {
-        setFiles((prev) => prev.filter((f) => f.uploaderId !== userId));
-      } else {
-        setFiles([]);
-      }
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to delete all files");
     }
   };
 
@@ -946,32 +843,6 @@ export const Editor: React.FC<EditorProps> = ({
       ydoc.off('update', saveHandler);
     };
   }, [ydoc, roomSlug]);
-
-  // Fetch files for mobile modal
-  useEffect(() => {
-    const fetchFiles = async () => {
-      if (!ydoc) return;
-      try {
-        const res = await api.get(`/api/rooms/${roomSlug}/files`);
-        setFiles(Array.isArray(res.data) ? res.data : []);
-      } catch (e) {
-        console.error(e);
-        setFiles([]);
-      }
-    };
-
-    if (ydoc) {
-      fetchFiles();
-
-      // Refetch when metadata changes
-      const yMeta = ydoc.getMap("meta");
-      const observer = () => {
-        fetchFiles();
-      };
-      yMeta.observe(observer);
-      return () => yMeta.unobserve(observer);
-    }
-  }, [roomSlug, ydoc]);
 
   // Fetch room snapshot from server (for 404 check and server merge)
   useEffect(() => {
@@ -1244,16 +1115,11 @@ export const Editor: React.FC<EditorProps> = ({
           setShowFilesModal(false);
           editorRef.current?.focus();
         }}
-        files={files}
-        onUpload={handleFileUpload}
-        onDelete={handleFileDelete}
-        onDeleteAll={handleDeleteAll}
-        uploading={uploading}
-        uploadProgress={uploadProgress}
-        uploadSpeed={uploadSpeed}
-        userId={userId}
         roomSlug={roomSlug}
+        ydoc={ydoc}
+        userId={userId}
         isRoomOwner={isOwner}
+        editor={editorRef.current?.getEditor() ?? null}
       />
 
       {/* Keyboard Shortcuts Popup */}
